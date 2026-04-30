@@ -27,10 +27,10 @@
 
     /* Path aliases */
     "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
     "paths": {
       "@/*": ["src/*"]
-    },
-    "ignoreDeprecations": "5.0"
+    }
   },
   "include": ["src"]
 }
