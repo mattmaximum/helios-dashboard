@@ -7,15 +7,6 @@ interface Props {
   lastUpdated: number;
 }
 
-const stormIcons: Record<string, typeof AlertTriangle> = {
-  quiet: Shield,
-  minor: Wind,
-  moderate: Wind,
-  strong: Zap,
-  severe: Zap,
-  extreme: AlertTriangle,
-};
-
 const stormClasses: Record<string, string> = {
   G0: 'text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.6)]',
   G1: 'text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]',
@@ -53,14 +44,6 @@ const glowColors: Record<string, string> = {
 };
 
 export default function StormAlert({ stormLevel, currentKp, lastUpdated }: Props) {
-  const iconKey = stormLevel
-    ? stormLevel.code === 'G0'
-      ? 'quiet'
-      : stormLevel.code
-        ? stormLevel.code.toLowerCase()
-        : 'quiet'
-    : 'quiet';
-  const Icon = stormIcons[iconKey] || Shield;
   const code = stormLevel?.code || 'G0';
   const isSevere = code === 'G4' || code === 'G5';
   const isWarning = code === 'G3';

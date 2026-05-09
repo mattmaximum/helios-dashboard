@@ -1,4 +1,4 @@
-import { Activity, Globe, Waves, ExternalLink } from 'lucide-react';
+import { Activity, Waves, ExternalLink } from 'lucide-react';
 
 export default function SchumannResonance() {
   // Schumann resonance frequencies (approximate)

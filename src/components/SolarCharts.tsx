@@ -1,4 +1,3 @@
-import { cn } from '@/lib/utils';
 import type { XrayFluxPoint, SolarWindData } from '@/data/solarData';
 import {
   AreaChart,
@@ -9,16 +8,16 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
-  Cell,
 } from 'recharts';
 
 // Custom tooltip
-function ChartTooltip({ active, payload, label }: any) {
+function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color?: string }[]; label?: string }) {
   if (!active || !payload?.length) return null;
+  const timeStr = label ? new Date(label).toLocaleString() : '';
   return (
     <div className="rounded-lg border border-gray-700/60 bg-gray-950/95 px-3 py-2 text-xs shadow-xl backdrop-blur-sm">
-      <p className="mb-1 font-semibold text-gray-300">{new Date(label).toLocaleString()}</p>
-      {payload.map((p: any, i: number) => (
+      {timeStr && <p className="mb-1 font-semibold text-gray-300">{timeStr}</p>}
+      {payload.map((p: { name: string; value: number; color?: string }, i: number) => (
         <p key={i} style={{ color: p.color || '#fff' }}>
           {p.name}: {p.value?.toFixed?.(2) ?? p.value}
         </p>
@@ -88,9 +87,7 @@ export default function SolarCharts({ kpIndex, xrayFlux, solarWind }: Props) {
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#1a1f2e" />
             <XAxis dataKey="time" stroke="#374151" tick={{ fontSize: 10 }} tickMargin={4} interval="preserveStartEnd" />
-            <YAxis domain={[0, 9]} stroke="#374151" tick={{ fontSize: 10 }}>
-              <YAxisAxisText text="Kp" angle={-90} textAnchor="middle" />
-            </YAxis>
+            <YAxis domain={[0, 9]} stroke="#374151" tick={{ fontSize: 10 }} label={{ value: 'Kp', angle: -90, position: 'insideLeft', style: { fill: '#6b7280', fontSize: 11 } }} />
             <Tooltip content={<ChartTooltip />} />
             <ReferenceLine y={5} stroke="#eab308" strokeDasharray="4 4" label={{ value: 'G2', fill: '#eab308', fontSize: 10 }} />
             <ReferenceLine y={7} stroke="#ef4444" strokeDasharray="4 4" label={{ value: 'G3', fill: '#ef4444', fontSize: 10 }} />
@@ -154,7 +151,7 @@ export default function SolarCharts({ kpIndex, xrayFlux, solarWind }: Props) {
             <Tooltip content={<ChartTooltip />} />
             <ReferenceLine y={0} stroke="#4a4f5e" strokeWidth={1} />
             <Area type="monotone" dataKey="bz" name="Bz" stroke="#ef4444" fill="#ef4444" fillOpacity={0.15} strokeWidth={1.5} />
-            <Area type="monotone" dataKey="bx" name="Bx" stroke="#22d3ee" name="Bx" fill="#22d3ee" fillOpacity={0.05} strokeWidth={1} />
+            <Area type="monotone" dataKey="bx" name="Bx" stroke="#22d3ee" fill="#22d3ee" fillOpacity={0.05} strokeWidth={1} />
             <Area type="monotone" dataKey="by" name="By" stroke="#a855f7" fill="#a855f7" fillOpacity={0.05} strokeWidth={1} />
           </AreaChart>
         </ResponsiveContainer>

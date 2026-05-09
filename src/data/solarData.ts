@@ -65,11 +65,10 @@ export function getStormLevel(kp: number): StormLevel {
       description: 'Quiet geomagnetic conditions',
     };
   }
-  if (kp < 1) return { code: 'G0', label: 'No Storm', color: '#10B981', description: 'Quiet geomagnetic conditions' };
+  if (kp < 1) return { code: 'G0', label: 'No Storm', color: '#10B981', description: 'No geomagnetic storm' };
   if (kp < 2.97) return { code: 'G1', label: 'Minor Storm', color: '#10B981', description: 'Weak fluctuations in the geomagnetic field' };
-  if (kp < 4.97) return { code: 'G1', label: 'Minor Storm', color: '#FBBF24', description: 'Weak fluctuations in the geomagnetic field' };
-  if (kp < 5.97) return { code: 'G2', label: 'Moderate Storm', color: '#FBBF24', description: 'Possible minor impact on power systems' };
-  if (kp < 6.97) return { code: 'G3', label: 'Strong Storm', color: '#FF8C42', description: 'Potential power grid problems, aurora visible at mid-latitudes' };
+  if (kp < 4.97) return { code: 'G2', label: 'Moderate Storm', color: '#FBBF24', description: 'Possible minor impact on power systems' };
+  if (kp < 5.97) return { code: 'G3', label: 'Strong Storm', color: '#FF8C42', description: 'Potential power grid problems, aurora visible at mid-latitudes' };
   if (kp < 7.97) return { code: 'G4', label: 'Severe Storm', color: '#EF4444', description: 'Widespread voltage control problems, aurora seen at low latitudes' };
   if (kp < 8.97) return { code: 'G5', label: 'Extreme Storm', color: '#DC2626', description: 'Severe space weather, extreme impacts on systems' };
   return { code: 'G5', label: 'Extreme Storm', color: '#DC2626', description: 'Severe space weather, extreme impacts on systems' };
@@ -105,16 +104,20 @@ function parseKpLine(text: string, idx: number): KpReading | null {
   const parts = line.trim().split(/\s+/);
   if (parts.length < 8) return null;
   const dayOfYear = parseInt(parts[1], 10);
-  const hours = parseInt(parts[2], 10);
-  const minutes = parseInt(parts[3], 10);
   const date = new Date(Date.UTC(2025, 0, 1));
+  // Compute actual year from day-of-year (handle wrap-around roughly)
+  date.setUTCFullYear(2025 + Math.floor(dayOfYear / 366));
+  date.setUTCMonth(0, 1);
   date.setUTCDate(dayOfYear);
+  if (parts[2] && parts[3]) {
+    date.setUTCHours(parseInt(parts[2], 10), parseInt(parts[3], 10));
+  }
   const kp = parts[5] === 'Kp' ? parseFloat(parts[6]) : null;
   const aIdx = parts[8] === 'A' ? parseInt(parts[9], 10) : null;
   return {
     timestamp: date.toISOString(),
     kp,
-    aIndex: isNaN(aIdx) ? null : aIdx,
+    aIndex: aIdx != null && !isNaN(aIdx) ? aIdx : null,
   };
 }
 
@@ -228,14 +231,12 @@ export async function fetchSolarData(): Promise<SolarData> {
   const lastUpdated = Date.now();
 
   // Fetch Kp index
-  let kpIndex: KpReading[] = [];
-  let kpError: string | null = null;
+  let kpIndex: KpReading[];
   try {
     const text = await fetch(URLS.geoIndex).then((r) => r.text());
     kpIndex = parseKpText(text);
-  } catch (e: any) {
-    console.warn('[Helios] Kp-index API failed, using mock data:', e?.message);
-    kpError = e?.message;
+  } catch (e: unknown) {
+    console.warn('[Helios] Kp-index API failed, using mock data:', e instanceof Error ? e.message : e);
     kpIndex = getMockKpData();
   }
 
@@ -245,10 +246,11 @@ export async function fetchSolarData(): Promise<SolarData> {
   const currentStormLevel = currentKp != null ? getStormLevel(currentKp) : null;
 
   // Fetch solar wind
-  let solarWind: SolarWindData[] = [];
+  let solarWind: SolarWindData[];
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const plasma = await fetchJSON<any[]>(URLS.plasma);
-    solarWind = plasma.map((item: any) => ({
+    solarWind = plasma.map((item) => ({
       timestamp: item.created || new Date().toISOString(),
       speed: item.speed ?? null,
       density: item.density ?? null,
@@ -259,24 +261,26 @@ export async function fetchSolarData(): Promise<SolarData> {
     }));
     // Reverse to have oldest first
     solarWind.reverse();
-  } catch (e: any) {
-    console.warn('[Helios] Solar wind API failed, using mock data:', e?.message);
+  } catch (e: unknown) {
+    console.warn('[Helios] Solar wind API failed, using mock data:', e instanceof Error ? e.message : e);
     solarWind = getMockSolarWind();
   }
 
   // Fetch X-ray flux
-  let xrayFlux: XrayFluxPoint[] = [];
-  let xrayFlares: XrayFlareReading[] = [];
+  let xrayFlux: XrayFluxPoint[];
+  let xrayFlares: XrayFlareReading[];
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const xrayData = await fetchJSON<any>(URLS.xray);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     xrayFlux = xrayData.data.map((item: any) => ({
       time: item.time || new Date().toISOString(),
       flux: item.flux ?? null,
       class: item.class || 'UNKNOWN',
     }));
     xrayFlares = xrayData.flares || [];
-  } catch (e: any) {
-    console.warn('[Helios] X-ray flux API failed, using mock data:', e?.message);
+  } catch (e: unknown) {
+    console.warn('[Helios] X-ray flux API failed, using mock data:', e instanceof Error ? e.message : e);
     const mock = getMockXrayFlux();
     xrayFlux = mock.data;
     xrayFlares = mock.flares;

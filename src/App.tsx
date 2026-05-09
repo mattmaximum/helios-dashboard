@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { AlertTriangle, Wind, ThermometerSun, ArrowDownUp, RefreshCw, Zap, Sun, Shield, Activity } from 'lucide-react';
-import { fetchSolarData, SolarData, getStormLevel, getStormLevelNumeric } from '@/data/solarData';
+import { AlertTriangle, Wind, ThermometerSun, RefreshCw, Zap, Sun, Activity } from 'lucide-react';
+import { fetchSolarData, SolarData, getStormLevelNumeric } from '@/data/solarData';
 import StormAlert from './components/StormAlert';
 import KpGauge from './components/KpGauge';
 import MetricCard from './components/MetricCard';
@@ -9,7 +9,6 @@ import SolarCharts from './components/SolarCharts';
 import SchumannResonance from './components/SchumannResonance';
 
 const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
-const AUTO_REFRESH_LABELS = ['Auto-refresh', '5m', '4:59', '4:58', '4:57'];
 
 function useSolarData() {
   const [data, setData] = useState<SolarData | null>(null);
@@ -22,23 +21,27 @@ function useSolarData() {
       const result = await fetchSolarData();
       setData(result);
       setError(null);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch solar data');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch solar data';
+      setError(message);
     } finally {
       if (!isAuto) setLoading(false);
     }
   }, []);
 
+  // Initial fetch
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData(false);
   }, [loadData]);
 
-  return { data, loading, error, refresh: () => loadData(true) };
-}
+  // Auto-refresh every REFRESH_INTERVAL
+  useEffect(() => {
+    const id = setInterval(() => loadData(true), REFRESH_INTERVAL);
+    return () => clearInterval(id);
+  }, [loadData]);
 
-function formatFlux(flux: number | null): string {
-  if (flux == null) return '—';
-  return flux.toFixed(0);
+  return { data, loading, error, refresh: () => loadData(true) };
 }
 
 export default function App() {
@@ -105,9 +108,6 @@ export default function App() {
         timeStyle: 'short',
       })
     : new Date(data.lastUpdated).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-
-  // Format Kp display
-  const kpDisplay = data.currentKp != null ? data.currentKp.toFixed(1) : '—';
 
   return (
     <div className="min-h-screen aurora-bg">
@@ -197,7 +197,6 @@ export default function App() {
         <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
           <KpGauge
             currentKp={currentKpNum}
-            kpIndex={data.kpIndex}
           />
           <LiveSun />
         </div>
@@ -225,7 +224,7 @@ export default function App() {
             Data sourced from NOAA SWPC &amp; NASA SDO with graceful mock fallbacks | Built with React + Recharts + Tailwind v4
           </p>
           <p className="mt-1 text-xs text-gray-800">
-            &copy; {new Date().getFullYear()} Hai Nguyen (nguyenhaidev)
+            &copy; {new Date().getFullYear()} Project Helios
           </p>
         </footer>
       </main>
