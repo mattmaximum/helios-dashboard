@@ -1,11 +1,8 @@
-import { cn } from '@/lib/utils';
-
 interface Props {
   currentKp: number | null;
-  kpIndex: { timestamp: string; kp: number | null }[];
 }
 
-export default function KpGauge({ currentKp, kpIndex }: Props) {
+export default function KpGauge({ currentKp }: Props) {
   // Build arc segments for the gauge
   const segments: { start: number; end: number; color: string; label: string }[] = [
     { start: 0, end: 1.99, color: '#059669', label: 'Q' },

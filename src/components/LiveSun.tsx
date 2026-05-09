@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sun, Eye, EyeOff } from 'lucide-react';
+import { Sun, EyeOff } from 'lucide-react';
 import { getSunImageUrl, getWavelengthOptions, WavelengthKey } from '@/data/solarData';
 
 export default function LiveSun() {
@@ -77,7 +77,7 @@ export default function LiveSun() {
             src={getSunImageUrl(wavelength)}
             alt=""
             className="h-0 w-0"
-            onLoad={(e) => !imageLoaded && setImageLoaded(true)}
+            onLoad={() => !imageLoaded && setImageLoaded(true)}
           />
           <span className="text-xs text-gray-300" title={current.name}>
             {imageUrl.split('/').pop()?.replace('.jpg', 'Å') || current.name}
