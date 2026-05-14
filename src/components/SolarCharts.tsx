@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { XrayFluxPoint, SolarWindData } from '@/data/solarData';
 import {
   AreaChart,
@@ -9,6 +10,14 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
+
+type TimeRange = '24h' | '72h' | '1w';
+
+const TIME_RANGES: { key: TimeRange; label: string; ms: number }[] = [
+  { key: '24h', label: '24 hours', ms: 24 * 60 * 60 * 1000 },
+  { key: '72h', label: '72 hours', ms: 72 * 60 * 60 * 1000 },
+  { key: '1w', label: '1 week', ms: 7 * 24 * 60 * 60 * 1000 },
+];
 
 // Custom tooltip
 function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color?: string }[]; label?: string }) {
@@ -31,6 +40,24 @@ function formatTime(dateStr: string) {
   return `${d.getUTCHours().toString().padStart(2, '0')}:${d.getUTCMinutes().toString().padStart(2, '0')}`;
 }
 
+function formatDate(dateStr: string) {
+  const d = new Date(dateStr);
+  return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
+}
+
+/** Filter data to only include points within the given time range from now */
+function filterByRange<T extends { timestamp: string } | { time: string }>(
+  data: T[],
+  rangeMs: number,
+  timeKey: 'timestamp' | 'time'
+): T[] {
+  const cutoff = Date.now() - rangeMs;
+  return data.filter((d) => {
+    const ts = new Date(timeKey === 'timestamp' ? (d as any).timestamp : (d as any).time);
+    return ts.getTime() >= cutoff;
+  });
+}
+
 interface Props {
   kpIndex: { timestamp: string; kp: number | null }[];
   xrayFlux: XrayFluxPoint[];
@@ -38,16 +65,30 @@ interface Props {
 }
 
 export default function SolarCharts({ kpIndex, xrayFlux, solarWind }: Props) {
+  const [range, setRange] = useState<TimeRange>('24h');
+
+  const activeRange = TIME_RANGES.find((r) => r.key === range)!;
+  const rangeMs = activeRange.ms;
+  const rangeLabel = activeRange.label;
+
+  // Filter data by time range
+  const filteredKp = filterByRange(kpIndex, rangeMs, 'timestamp');
+  const filteredXray = filterByRange(xrayFlux, rangeMs, 'time');
+  const filteredWind = filterByRange(solarWind, rangeMs, 'timestamp');
+
+  // Decide which time formatter to use
+  const timeFmt = range === '1w' ? formatDate : formatTime;
+
   // Prepare KP chart data
-  const kpData = kpIndex.map((d) => ({
-    time: formatTime(d.timestamp),
+  const kpData = filteredKp.map((d) => ({
+    time: timeFmt(d.timestamp),
     kp: d.kp ?? 0,
     fullTime: d.timestamp,
   }));
 
   // Prepare X-ray chart data
-  const xrayData = xrayFlux.map((d) => ({
-    time: formatTime(d.time),
+  const xrayData = filteredXray.map((d) => ({
+    time: timeFmt(d.time),
     flux: d.flux ?? 0,
     class: d.class,
     isFlare: (d.flux ?? 0) > 1e-6,
@@ -55,28 +96,53 @@ export default function SolarCharts({ kpIndex, xrayFlux, solarWind }: Props) {
   }));
 
   // Prepare solar wind chart data
-  const windData = solarWind.map((d) => ({
-    time: formatTime(d.timestamp),
+  const windData = filteredWind.map((d) => ({
+    time: timeFmt(d.timestamp),
     speed: d.speed ?? 0,
     density: d.density ?? 0,
     fullTime: d.timestamp,
   }));
 
   // Bz chart data
-  const bzData = solarWind.map((d) => ({
-    time: formatTime(d.timestamp),
+  const bzData = filteredWind.map((d) => ({
+    time: timeFmt(d.timestamp),
     bz: d.bz ?? 0,
     bx: d.bx ?? 0,
     by: d.by ?? 0,
     fullTime: d.timestamp,
   }));
 
+  const rangeButtons = (
+    <div className="flex items-center gap-2">
+      {TIME_RANGES.map((r) => (
+        <button
+          key={r.key}
+          onClick={() => setRange(r.key)}
+          className={`rounded-lg border px-3 py-1 text-xs font-semibold transition-all duration-200 ${
+            range === r.key
+              ? 'border-plasma-orange/60 bg-plasma-orange/15 text-plasma-orange'
+              : 'border-gray-700/40 bg-gray-800/40 text-gray-500 hover:border-gray-600/50 hover:text-gray-300'
+          }`}
+        >
+          {r.label}
+        </button>
+      ))}
+    </div>
+  );
+
   return (
     <div className="flex flex-col gap-6">
+      {/* Range toggle bar */}
+      <div className="flex items-center justify-end">
+        {rangeButtons}
+      </div>
+
       {/* KP Index Chart */}
       <div className="rounded-2xl border border-gray-800/40 bg-gray-950/50 p-6 backdrop-blur-sm">
-        <h3 className="mb-1 text-sm font-semibold uppercase tracking-widest text-gray-400">Kp-index (24h)</h3>
-        <p className="mb-4 text-xs text-gray-600">Geomagnetic activity over the last 24 hours</p>
+        <h3 className="mb-1 text-sm font-semibold uppercase tracking-widest text-gray-400">
+          Kp-index ({rangeLabel})
+        </h3>
+        <p className="mb-4 text-xs text-gray-600">Geomagnetic activity over the last {rangeLabel.toLowerCase()}</p>
         <ResponsiveContainer width="100%" height={220}>
           <AreaChart data={kpData}>
             <defs>
@@ -99,7 +165,9 @@ export default function SolarCharts({ kpIndex, xrayFlux, solarWind }: Props) {
 
       {/* X-ray Flux Chart */}
       <div className="rounded-2xl border border-gray-800/40 bg-gray-950/50 p-6 backdrop-blur-sm">
-        <h3 className="mb-1 text-sm font-semibold uppercase tracking-widest text-gray-400">X-ray Flux (24h)</h3>
+        <h3 className="mb-1 text-sm font-semibold uppercase tracking-widest text-gray-400">
+          X-ray Flux ({rangeLabel})
+        </h3>
         <p className="mb-4 text-xs text-gray-600">X-class &gt; M-class &gt; C-class &gt; B-class</p>
         <ResponsiveContainer width="100%" height={220}>
           <AreaChart data={xrayData}>
@@ -124,7 +192,9 @@ export default function SolarCharts({ kpIndex, xrayFlux, solarWind }: Props) {
 
       {/* Solar Wind Speed + Density */}
       <div className="rounded-2xl border border-gray-800/40 bg-gray-950/50 p-6 backdrop-blur-sm">
-        <h3 className="mb-1 text-sm font-semibold uppercase tracking-widest text-gray-400">Solar Wind Speed & Density</h3>
+        <h3 className="mb-1 text-sm font-semibold uppercase tracking-widest text-gray-400">
+          Solar Wind Speed &amp; Density ({rangeLabel})
+        </h3>
         <p className="mb-4 text-xs text-gray-600">Speed (km/s, solid) and Density (p/cm³, dashed)</p>
         <ResponsiveContainer width="100%" height={200}>
           <AreaChart data={windData}>
@@ -141,7 +211,9 @@ export default function SolarCharts({ kpIndex, xrayFlux, solarWind }: Props) {
 
       {/* Bz Component */}
       <div className="rounded-2xl border border-gray-800/40 bg-gray-950/50 p-6 backdrop-blur-sm">
-        <h3 className="mb-1 text-sm font-semibold uppercase tracking-widest text-gray-400">Interplanetary Magnetic Field (Bz, Bx, By)</h3>
+        <h3 className="mb-1 text-sm font-semibold uppercase tracking-widest text-gray-400">
+          Interplanetary Magnetic Field ({rangeLabel})
+        </h3>
         <p className="mb-4 text-xs text-gray-600">Southward Bz drives geomagnetic storms (red = negative)</p>
         <ResponsiveContainer width="100%" height={200}>
           <AreaChart data={bzData}>
