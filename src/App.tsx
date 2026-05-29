@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AlertTriangle, Wind, ThermometerSun, RefreshCw, Zap, Sun, Activity } from 'lucide-react';
-import { fetchSolarData, SolarData, getStormLevelNumeric } from '@/data/solarData';
+import { fetchSolarData, SolarData } from '@/data/solarData';
 import StormAlert from './components/StormAlert';
 import KpGauge from './components/KpGauge';
 import MetricCard from './components/MetricCard';
@@ -89,9 +89,7 @@ export default function App() {
     );
   }
 
-  const currentKpNum = data.currentStormLevel
-    ? getStormLevelNumeric(data.currentKp || 0)
-    : 0;
+  const currentKpNum = data.currentKp ?? 0;
   const stormLevel = data.currentStormLevel || {
     code: 'G0',
     label: 'Quiet',

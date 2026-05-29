@@ -56,22 +56,18 @@ export interface SolarData {
 }
 
 // --- Storm Level Mapper ---
+// NOAA G-scale: G1=Kp5, G2=Kp6, G3=Kp7, G4=Kp8, G5=Kp9
+// ref: https://www.swpc.noaa.gov/noaa-scales-explanation
 export function getStormLevel(kp: number): StormLevel {
-  if (kp == null || kp < 0) {
-    return {
-      code: 'G0',
-      label: 'No Storm',
-      color: '#10B981',
-      description: 'Quiet geomagnetic conditions',
-    };
+  if (kp < 0) {
+    return { code: 'G0', label: 'Quiet', color: '#10B981', description: 'Quiet geomagnetic conditions' };
   }
-  if (kp < 1) return { code: 'G0', label: 'No Storm', color: '#10B981', description: 'No geomagnetic storm' };
-  if (kp < 2.97) return { code: 'G1', label: 'Minor Storm', color: '#10B981', description: 'Weak fluctuations in the geomagnetic field' };
-  if (kp < 4.97) return { code: 'G2', label: 'Moderate Storm', color: '#FBBF24', description: 'Possible minor impact on power systems' };
-  if (kp < 5.97) return { code: 'G3', label: 'Strong Storm', color: '#FF8C42', description: 'Potential power grid problems, aurora visible at mid-latitudes' };
-  if (kp < 7.97) return { code: 'G4', label: 'Severe Storm', color: '#EF4444', description: 'Widespread voltage control problems, aurora seen at low latitudes' };
-  if (kp < 8.97) return { code: 'G5', label: 'Extreme Storm', color: '#DC2626', description: 'Severe space weather, extreme impacts on systems' };
-  return { code: 'G5', label: 'Extreme Storm', color: '#DC2626', description: 'Severe space weather, extreme impacts on systems' };
+  if (kp < 5) return { code: 'G0', label: 'Quiet', color: '#10B981', description: 'No geomagnetic storm activity' };
+  if (kp < 6) return { code: 'G1', label: 'Minor Storm', color: '#84CC16', description: 'Minor impact on satellite navigation, aurora visible at high latitudes' };
+  if (kp < 7) return { code: 'G2', label: 'Moderate Storm', color: '#FBBF24', description: 'Possible minor impact on power systems and satellite operations' };
+  if (kp < 8) return { code: 'G3', label: 'Strong Storm', color: '#FF8C42', description: 'Power grid problems possible, aurora visible at mid-latitudes' };
+  if (kp < 9) return { code: 'G4', label: 'Severe Storm', color: '#EF4444', description: 'Widespread voltage control problems, aurora seen at low latitudes' };
+  return { code: 'G5', label: 'Extreme Storm', color: '#DC2626', description: 'Severe space weather with extreme impacts on infrastructure' };
 }
 
 export function getStormLevelNumeric(kp: number): number {
@@ -218,13 +214,20 @@ function classifyFlux(flux: number): string {
 export async function fetchSolarData(): Promise<SolarData> {
   const lastUpdated = Date.now();
 
-  // Fetch Kp index from noaa-planetary-k-index.json
+  // Fetch all APIs in parallel
+  const [kpResult, plasmaResult, magResult, xrayResult] = await Promise.allSettled([
+    fetchJSON<Record<string, unknown>[]>(URLS.kpIndex),
+    fetchProductCSV<Record<string, string>>(URLS.plasma),
+    fetchProductCSV<Record<string, string>>(URLS.mag),
+    fetchJSON<Record<string, unknown>[]>(URLS.xray),
+  ]);
+
+  // Kp index
   let kpIndex: KpReading[];
-  try {
-    const raw = await fetchJSON<Record<string, unknown>[]>(URLS.kpIndex);
-    kpIndex = parseKpJson(raw);
-  } catch (e: unknown) {
-    console.warn('[Helios] Kp-index API failed, using mock data:', e instanceof Error ? e.message : e);
+  if (kpResult.status === 'fulfilled') {
+    kpIndex = parseKpJson(kpResult.value);
+  } else {
+    console.warn('[Helios] Kp-index API failed, using mock data:', kpResult.reason instanceof Error ? kpResult.reason.message : kpResult.reason);
     kpIndex = getMockKpData();
   }
 
@@ -233,27 +236,24 @@ export async function fetchSolarData(): Promise<SolarData> {
     : null;
   const currentStormLevel = currentKp != null ? getStormLevel(currentKp) : null;
 
-  // Fetch solar wind plasma (speed, density, temperature)
-  // + magnetic field (bz, bx, by) — both are header+rows CSV-style JSON
+  // Solar wind plasma + magnetic field
   let solarWind: SolarWindData[];
   let plasmaData: Record<string, string>[];
   let magData: Record<string, string>[];
-  let plasmaOk = false;
-  let magOk = false;
+  const plasmaOk = plasmaResult.status === 'fulfilled';
+  const magOk = magResult.status === 'fulfilled';
 
-  try {
-    plasmaData = await fetchProductCSV<Record<string, string>>(URLS.plasma);
-    plasmaOk = true;
-  } catch (e: unknown) {
-    console.warn('[Helios] Plasma API failed:', e instanceof Error ? e.message : e);
+  if (plasmaOk) {
+    plasmaData = plasmaResult.value;
+  } else {
+    console.warn('[Helios] Plasma API failed:', plasmaResult.reason instanceof Error ? plasmaResult.reason.message : plasmaResult.reason);
     plasmaData = [];
   }
 
-  try {
-    magData = await fetchProductCSV<Record<string, string>>(URLS.mag);
-    magOk = true;
-  } catch (e: unknown) {
-    console.warn('[Helios] Magnetometer API failed:', e instanceof Error ? e.message : e);
+  if (magOk) {
+    magData = magResult.value;
+  } else {
+    console.warn('[Helios] Magnetometer API failed:', magResult.reason instanceof Error ? magResult.reason.message : magResult.reason);
     magData = [];
   }
 
@@ -292,18 +292,16 @@ export async function fetchSolarData(): Promise<SolarData> {
     solarWind = getMockSolarWind();
   }
 
-  // Fetch X-ray flux — flat array of objects with time_tag + flux
+  // X-ray flux — use the parallel result
   let xrayFlux: XrayFluxPoint[];
   let xrayFlares: XrayFlareReading[];
-  try {
-    const xrayData = await fetchJSON<Record<string, unknown>[]>(URLS.xray);
-    // The endpoint returns per-satellite data; pick satellite 18 (GOES-18, primary)
-    // Filter to one satellite to avoid duplicates, then simplify
+  if (xrayResult.status === 'fulfilled') {
+    const xrayData = xrayResult.value;
+    // Pick satellite 18 (GOES-18, primary) to avoid duplicates
     const goes18 = xrayData.filter((d) => d.satellite === 18);
-    // There are two channels: 0.05-0.4nm (short) and 0.1-0.8nm (long)
-    // Use the long channel (higher flux values) for flare classification
-    const longChannel = goes18.filter((d: Record<string, unknown>) => (d.flux as number) > 1e-7);
-    xrayFlux = (longChannel.length > 50 ? longChannel : goes18).map((d: Record<string, unknown>) => {
+    // Use long channel (0.1-0.8nm) which is the standard for GOES flare classification
+    const longChannel = goes18.filter((d: Record<string, unknown>) => d.energy === '0.1-0.8nm');
+    xrayFlux = (longChannel.length > 0 ? longChannel : goes18).map((d: Record<string, unknown>) => {
       const flux = (d.flux ?? d.observed_flux ?? 0) as number;
       return {
         time: (d.time_tag as string) || new Date().toISOString(),
@@ -312,8 +310,8 @@ export async function fetchSolarData(): Promise<SolarData> {
       };
     });
     xrayFlares = [];
-  } catch (e: unknown) {
-    console.warn('[Helios] X-ray flux API failed, using mock data:', e instanceof Error ? e.message : e);
+  } else {
+    console.warn('[Helios] X-ray flux API failed, using mock data:', xrayResult.reason instanceof Error ? xrayResult.reason.message : xrayResult.reason);
     const mock = getMockXrayFlux();
     xrayFlux = mock.data;
     xrayFlares = mock.flares;

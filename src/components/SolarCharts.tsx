@@ -46,16 +46,9 @@ function formatDate(dateStr: string) {
 }
 
 /** Filter data to only include points within the given time range from now */
-function filterByRange<T extends { timestamp: string } | { time: string }>(
-  data: T[],
-  rangeMs: number,
-  timeKey: 'timestamp' | 'time'
-): T[] {
+function filterByRange<T>(data: T[], rangeMs: number, getTime: (d: T) => string): T[] {
   const cutoff = Date.now() - rangeMs;
-  return data.filter((d) => {
-    const ts = new Date(timeKey === 'timestamp' ? (d as any).timestamp : (d as any).time);
-    return ts.getTime() >= cutoff;
-  });
+  return data.filter((d) => new Date(getTime(d)).getTime() >= cutoff);
 }
 
 interface Props {
@@ -72,9 +65,9 @@ export default function SolarCharts({ kpIndex, xrayFlux, solarWind }: Props) {
   const rangeLabel = activeRange.label;
 
   // Filter data by time range
-  const filteredKp = filterByRange(kpIndex, rangeMs, 'timestamp');
-  const filteredXray = filterByRange(xrayFlux, rangeMs, 'time');
-  const filteredWind = filterByRange(solarWind, rangeMs, 'timestamp');
+  const filteredKp = filterByRange(kpIndex, rangeMs, (d) => d.timestamp);
+  const filteredXray = filterByRange(xrayFlux, rangeMs, (d) => d.time);
+  const filteredWind = filterByRange(solarWind, rangeMs, (d) => d.timestamp);
 
   // Decide which time formatter to use
   const timeFmt = range === '1w' ? formatDate : formatTime;
