@@ -9,8 +9,8 @@ A real-time solar weather monitoring dashboard built with React, TypeScript, and
 - **X-Ray Flux Monitoring** — GOES-classification with flare detection thresholds
 - **Kp-Index Gauge** — Arc-style gauge with color-coded storm severity scale
 - **Live Solar Imagery** — NASA SDO imagery at 171Å, 193Å, 304Å, and magnetogram
-- **Historical Trends** — 24-hour charts for Kp, X-ray flux, solar wind, and IMF (Bz/Bx/By)
-- **Auto-Refresh** — Automatically polls NOAA data every 5 minutes
+- **Historical Trends** — Kp, X-ray flux, solar wind, and IMF (Bz/Bx/By) charts with 24h / 72h / 1-week range selector
+- **Auto-Refresh** — Automatically polls NOAA data every 5 minutes; manual refresh button in header
 - **Graceful Fallbacks** — Mock data when APIs are unavailable (no blank screens)
 - **Schumann Resonance** — Earth-ionosphere cavity resonance reference display
 
@@ -18,10 +18,13 @@ A real-time solar weather monitoring dashboard built with React, TypeScript, and
 
 | Data | Source | Endpoint |
 |---|---|---|
-| Geomagnetic Kp-index | NOAA SWPC | `swpc.noaa.gov/.../aggregate-geomagnetic-index.txt` |
-| Solar Wind Plasma | NOAA SWPC | `swpc.noaa.gov/json/plasma_7-day.json` |
-| X-Ray Flux | NOAA SWPC / GOES | `swpc.noaa.gov/json/goes/primary/xrays-6-hour.json` |
+| Geomagnetic Kp-index | NOAA SWPC | `services.swpc.noaa.gov/products/noaa-planetary-k-index.json` |
+| Solar Wind Plasma | NOAA SWPC | `services.swpc.noaa.gov/products/solar-wind/plasma-7-day.json` |
+| Interplanetary Magnetic Field | NOAA SWPC | `services.swpc.noaa.gov/products/solar-wind/mag-7-day.json` |
+| X-Ray Flux (GOES-18) | NOAA SWPC | `services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json` |
 | Solar Imagery | NASA SDO | `sdo.gsfc.nasa.gov/assets/img/latest/` |
+
+G-scale storm levels follow the [NOAA official classification](https://www.swpc.noaa.gov/noaa-scales-explanation): G1 = Kp5, G2 = Kp6, G3 = Kp7, G4 = Kp8, G5 = Kp9.
 
 ## Getting Started
 
