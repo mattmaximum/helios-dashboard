@@ -68,17 +68,10 @@ export default function LiveSun() {
           className={`${imageLoaded ? 'block' : 'hidden'} h-full w-full object-cover transition-opacity duration-500`}
           onLoad={() => setImageLoaded(true)}
           onError={() => setImageError(true)}
-          crossOrigin="anonymous"
         />
 
         {/* Overlay text */}
         <div className="absolute bottom-4 left-4 flex items-center gap-2 rounded-lg bg-black/60 px-3 py-1.5 backdrop-blur-sm">
-          <img
-            src={getSunImageUrl(wavelength)}
-            alt=""
-            className="h-0 w-0"
-            onLoad={() => !imageLoaded && setImageLoaded(true)}
-          />
           <span className="text-xs text-gray-300" title={current.name}>
             {imageUrl.split('/').pop()?.replace('.jpg', 'Å') || current.name}
           </span>

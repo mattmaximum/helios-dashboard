@@ -3,16 +3,14 @@ interface Props {
 }
 
 export default function KpGauge({ currentKp }: Props) {
-  // Build arc segments for the gauge
+  // Arc segments matching NOAA G-scale: G0=Kp<5, G1=Kp5, G2=Kp6, G3=Kp7, G4=Kp8, G5=Kp9
   const segments: { start: number; end: number; color: string; label: string }[] = [
-    { start: 0, end: 1.99, color: '#059669', label: 'Q' },
-    { start: 2, end: 2.99, color: '#65a30d', label: 'G1' },
-    { start: 3, end: 3.99, color: '#ca8a04', label: 'G1' },
-    { start: 4, end: 4.99, color: '#eab308', label: 'G2' },
-    { start: 5, end: 5.99, color: '#f97316', label: 'G3' },
-    { start: 6, end: 6.99, color: '#ef4444', label: 'G4' },
-    { start: 7, end: 7.99, color: '#dc2626', label: 'G5' },
-    { start: 8, end: 9, color: '#991b1b', label: 'G5' },
+    { start: 0, end: 4.99, color: '#059669', label: 'Q' },
+    { start: 5, end: 5.99, color: '#84cc16', label: 'G1' },
+    { start: 6, end: 6.99, color: '#eab308', label: 'G2' },
+    { start: 7, end: 7.99, color: '#f97316', label: 'G3' },
+    { start: 8, end: 8.99, color: '#ef4444', label: 'G4' },
+    { start: 9, end: 9,    color: '#991b1b', label: 'G5' },
   ];
 
   if (currentKp == null) {
@@ -139,12 +137,12 @@ export default function KpGauge({ currentKp }: Props) {
       {/* Scale legend */}
       <div className="mt-4 flex flex-wrap justify-center gap-3">
         {[
-          { label: 'Quiet', color: '#059669' },
-          { label: 'G1 Minor', color: '#65a30d' },
+          { label: 'Quiet (Kp<5)', color: '#059669' },
+          { label: 'G1 Minor', color: '#84cc16' },
           { label: 'G2 Moderate', color: '#eab308' },
           { label: 'G3 Strong', color: '#f97316' },
           { label: 'G4 Severe', color: '#ef4444' },
-          { label: 'G5 Extreme', color: '#dc2626' },
+          { label: 'G5 Extreme', color: '#991b1b' },
         ].map(({ label, color }) => (
           <div key={label} className="flex items-center gap-1.5">
             <div style={{ backgroundColor: color }} className="h-2.5 w-2.5 rounded-sm" />
