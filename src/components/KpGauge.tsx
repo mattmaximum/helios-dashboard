@@ -1,12 +1,22 @@
-import { getStormLevelNumeric } from '@/data/solarData';
+import { getStormLevel, getStormLevelNumeric } from '@/data/solarData';
 import InfoTip from './InfoTip';
 
 interface Props {
   currentKp: number | null;
 }
 
-function glowPulseClass(kp: number): string {
-  const level = getStormLevelNumeric(kp);
+// flex values sum to 9 — each unit = 1 Kp, so arrow position maps linearly
+const SEGMENTS = [
+  { label: 'Quiet',   sublabel: 'Kp < 5',  color: '#059669', flex: 5 },
+  { label: 'G1',      sublabel: 'Minor',    color: '#84cc16', flex: 1 },
+  { label: 'G2',      sublabel: 'Moderate', color: '#eab308', flex: 1 },
+  { label: 'G3',      sublabel: 'Strong',   color: '#f97316', flex: 1 },
+  { label: 'G4',      sublabel: 'Severe',   color: '#ef4444', flex: 0.7 },
+  { label: 'G5',      sublabel: 'Extreme',  color: '#7f1d1d', flex: 0.3 },
+];
+const TOTAL_FLEX = SEGMENTS.reduce((s, seg) => s + seg.flex, 0); // = 9
+
+function glowPulseClass(level: number): string {
   if (level >= 4) return 'kp-glow-pulse-g4';
   if (level === 3) return 'kp-glow-pulse-g3';
   if (level === 2) return 'kp-glow-pulse-g2';
@@ -14,157 +24,89 @@ function glowPulseClass(kp: number): string {
 }
 
 export default function KpGauge({ currentKp }: Props) {
-  // Arc segments matching NOAA G-scale: G0=Kp<5, G1=Kp5, G2=Kp6, G3=Kp7, G4=Kp8, G5=Kp9
-  const segments: { start: number; end: number; color: string; label: string }[] = [
-    { start: 0, end: 4.99, color: '#059669', label: 'Q' },
-    { start: 5, end: 5.99, color: '#84cc16', label: 'G1' },
-    { start: 6, end: 6.99, color: '#eab308', label: 'G2' },
-    { start: 7, end: 7.99, color: '#f97316', label: 'G3' },
-    { start: 8, end: 8.99, color: '#ef4444', label: 'G4' },
-    { start: 9, end: 9,    color: '#991b1b', label: 'G5' },
-  ];
-
   if (currentKp == null) {
     return (
-      <div className="rounded-2xl border border-gray-800/50 bg-gray-950/50 p-6 text-center backdrop-blur-sm">
-        <p className="text-gray-500">Awaiting data…</p>
+      <div className="h-full rounded-2xl border border-gray-800/50 bg-gray-950/50 p-6 flex items-center justify-center backdrop-blur-sm">
+        <p className="text-gray-500 text-sm">Awaiting data…</p>
       </div>
     );
   }
 
-  // Draw arc segments
-  const cx = 150;
-  const cy = 150;
-  const r = 110;
-  const rTick = 130;
-  const rInner = 85;
-
-  const polarToCartesian = (cx: number, cy: number, r: number, angleDeg: number) => {
-    const rad = ((angleDeg - 90) * Math.PI) / 180;
-    return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
-  };
-
-  const describeArc = (cx: number, cy: number, r: number, startAngle: number, endAngle: number) => {
-    const start = polarToCartesian(cx, cy, r, endAngle);
-    const end = polarToCartesian(cx, cy, r, startAngle);
-    const largeArcFlag = endAngle - startAngle <= 180 ? '0' : '1';
-    return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArcFlag} 0 ${end.x} ${end.y}`;
-  };
+  const level = getStormLevelNumeric(currentKp);
+  const stormLevel = getStormLevel(currentKp);
+  const clampedKp = Math.min(Math.max(currentKp, 0), 9);
+  // Arrow position as % of bar width (linear: 0 = left edge, 9 = right edge)
+  const arrowPct = (clampedKp / TOTAL_FLEX) * 100;
 
   return (
     <div className="h-full rounded-2xl border border-gray-800/40 bg-gray-950/50 p-6 backdrop-blur-sm flex flex-col">
-      <div className="mb-4 flex items-center gap-2">
-        <h3 className="text-sm font-semibold uppercase tracking-widest text-gray-400">Kp Index Gauge</h3>
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-5">
+        <h3 className="text-sm font-semibold uppercase tracking-widest text-gray-400">Kp Index</h3>
         <InfoTip content="The planetary K-index (Kp) measures global geomagnetic disturbance on a 0–9 scale, updated every 15 minutes. Kp 0–4 is quiet. Kp 5 starts a G1 minor storm. Kp 6+ (G2) is when real-world impacts begin — satellite drag, power grid fluctuations, and auroras visible in the northern US." />
       </div>
-      <div className="relative flex flex-1 items-center justify-center">
-        {/* Outer glow ring — pulses when G2+ */}
-        <div className={`absolute inset-0 rounded-full blur-xl opacity-30 pointer-events-none ${glowPulseClass(currentKp)}`} />
-        <svg width="300" height="300" viewBox="0 0 300 300" className="relative w-full max-w-[300px]">
-          {/* Background track */}
-          <path d={describeArc(cx, cy, r, 0, 270)} fill="none" stroke="#1a1f2e" strokeWidth="18" strokeLinecap="round" />
 
-          {/* Colored segments */}
-          {segments.map((seg, i) => (
-            <path
-              key={i}
-              d={describeArc(cx, cy, r, seg.start * 30, seg.end * 30)}
-              fill="none"
-              stroke={seg.color}
-              strokeWidth="18"
-              strokeLinecap="round"
-              opacity={0.8}
-            />
-          ))}
-
-          {/* Tick marks for 0-9 */}
-          {Array.from({ length: 10 }, (_, i) => {
-            const angle = i * 30;
-            const outer = polarToCartesian(cx, cy, rTick, angle);
-            const inner = polarToCartesian(cx, cy, r + 12, angle);
-            const isCurrent = i === Math.floor(currentKp);
-            return (
-              <line
-                key={i}
-                x1={inner.x}
-                y1={inner.y}
-                x2={outer.x}
-                y2={outer.y}
-                stroke={isCurrent ? '#FF6B35' : '#374151'}
-                strokeWidth={isCurrent ? 3 : 1.5}
-              />
-            );
-          })}
-
-          {/* Needle */}
-          {(() => {
-            const needleAngle = currentKp * 30;
-            const needleLen = r - 25;
-            const tip = polarToCartesian(cx, cy, needleLen, needleAngle);
-            const tail = polarToCartesian(cx, cy, 20, needleAngle);
-            return (
-              <line
-                x1={tail.x}
-                y1={tail.y}
-                x2={tip.x}
-                y2={tip.y}
-                stroke="#FF6B35"
-                strokeWidth="3"
-                strokeLinecap="round"
-                className="drop-shadow-[0_0_6px_rgba(255,107,53,0.8)]"
-              />
-            );
-          })()}
-
-          {/* Needle dot */}
-          <circle cx={cx} cy={cy} r="6" fill="#FF6B35" className="drop-shadow-[0_0_8px_rgba(255,107,53,0.6)]" />
-
-          {/* Labels */}
-          {Array.from({ length: 10 }, (_, i) => {
-            const angle = i * 30;
-            const pos = polarToCartesian(cx, cy, rInner - 20, angle);
-            const isCurrent = i === Math.floor(currentKp);
-            return (
-              <text
-                key={i}
-                x={pos.x}
-                y={pos.y}
-                textAnchor="middle"
-                dominantBaseline="central"
-                fill={isCurrent ? '#FF6B35' : '#6b7280'}
-                fontSize={isCurrent ? 14 : 11}
-                fontWeight={isCurrent ? 700 : 400}
-              >
-                {i}
-              </text>
-            );
-          })}
-
-          {/* Center text */}
-          <text x={cx} y={cy - 8} textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize="48" fontWeight="800">
-            {currentKp.toFixed(1)}
-          </text>
-          <text x={cx} y={cy + 20} textAnchor="middle" dominantBaseline="central" fill="#9ca3af" fontSize="11" fontWeight="500" letterSpacing="3">
-            CURRENT
-          </text>
-        </svg>
+      {/* Current Kp display */}
+      <div className="flex items-end gap-3 mb-6">
+        <span
+          className="text-5xl font-bold tabular-nums leading-none"
+          style={{ color: stormLevel.color }}
+        >
+          {clampedKp.toFixed(1)}
+        </span>
+        <div className="mb-1">
+          <p className="text-xs font-semibold uppercase tracking-widest text-gray-600">Kp Index</p>
+          <p className="text-sm font-semibold" style={{ color: stormLevel.color }}>
+            {stormLevel.label}
+          </p>
+        </div>
       </div>
 
-      {/* Scale legend */}
-      <div className="mt-4 flex flex-wrap justify-center gap-3">
-        {[
-          { label: 'Quiet (Kp<5)', color: '#059669' },
-          { label: 'G1 Minor', color: '#84cc16' },
-          { label: 'G2 Moderate', color: '#eab308' },
-          { label: 'G3 Strong', color: '#f97316' },
-          { label: 'G4 Severe', color: '#ef4444' },
-          { label: 'G5 Extreme', color: '#991b1b' },
-        ].map(({ label, color }) => (
-          <div key={label} className="flex items-center gap-1.5">
-            <div style={{ backgroundColor: color }} className="h-2.5 w-2.5 rounded-sm" />
-            <span className="text-xs text-gray-500">{label}</span>
+      {/* Bar + arrow — flex-1 so it fills remaining space, content centered */}
+      <div className={`flex-1 flex flex-col justify-center ${glowPulseClass(level)}`}>
+        {/* Arrow row */}
+        <div className="relative h-4 mb-1">
+          <div
+            className="absolute top-0 -translate-x-1/2 transition-all duration-700 ease-out"
+            style={{ left: `${arrowPct}%` }}
+          >
+            {/* Downward-pointing triangle */}
+            <div
+              className="w-0 h-0"
+              style={{
+                borderLeft: '6px solid transparent',
+                borderRight: '6px solid transparent',
+                borderTop: `9px solid ${stormLevel.color}`,
+                filter: `drop-shadow(0 0 4px ${stormLevel.color}88)`,
+              }}
+            />
           </div>
-        ))}
+        </div>
+
+        {/* Colored bar */}
+        <div className="flex rounded-lg overflow-hidden h-5" style={{ gap: '1px' }}>
+          {SEGMENTS.map((seg) => (
+            <div
+              key={seg.label}
+              style={{ flex: seg.flex, backgroundColor: seg.color }}
+              className="opacity-80"
+            />
+          ))}
+        </div>
+
+        {/* Segment labels */}
+        <div className="flex mt-2">
+          {SEGMENTS.map((seg) => (
+            <div
+              key={seg.label}
+              style={{ flex: seg.flex }}
+              className="flex flex-col items-center"
+            >
+              <span className="text-[10px] font-bold text-gray-400 leading-tight">{seg.label}</span>
+              <span className="text-[9px] text-gray-600 leading-tight hidden sm:block">{seg.sublabel}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
