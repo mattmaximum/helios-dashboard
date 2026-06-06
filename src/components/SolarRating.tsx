@@ -111,7 +111,7 @@ export default function SolarRating({ currentKp, windSpeed, xrayClass, f107 }: P
           />
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 leading-none mb-0.5">
-              Solar Activity
+              Current Solar Activity
             </p>
             <p className={`text-base font-bold leading-none ${cfg.text}`}>{cfg.label}</p>
           </div>
