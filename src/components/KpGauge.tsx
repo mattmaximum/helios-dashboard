@@ -1,5 +1,15 @@
+import { getStormLevelNumeric } from '@/data/solarData';
+
 interface Props {
   currentKp: number | null;
+}
+
+function glowPulseClass(kp: number): string {
+  const level = getStormLevelNumeric(kp);
+  if (level >= 4) return 'kp-glow-pulse-g4';
+  if (level === 3) return 'kp-glow-pulse-g3';
+  if (level === 2) return 'kp-glow-pulse-g2';
+  return '';
 }
 
 export default function KpGauge({ currentKp }: Props) {
@@ -44,7 +54,9 @@ export default function KpGauge({ currentKp }: Props) {
     <div className="rounded-2xl border border-gray-800/40 bg-gray-950/50 p-6 backdrop-blur-sm">
       <h3 className="mb-4 text-sm font-semibold uppercase tracking-widest text-gray-400">Kp Index Gauge</h3>
       <div className="relative flex justify-center">
-        <svg width="300" height="300" viewBox="0 0 300 300" className="w-full max-w-[300px]">
+        {/* Outer glow ring — pulses when G2+ */}
+        <div className={`absolute inset-0 rounded-full blur-xl opacity-30 pointer-events-none ${glowPulseClass(currentKp)}`} />
+        <svg width="300" height="300" viewBox="0 0 300 300" className="relative w-full max-w-[300px]">
           {/* Background track */}
           <path d={describeArc(cx, cy, r, 0, 270)} fill="none" stroke="#1a1f2e" strokeWidth="18" strokeLinecap="round" />
 

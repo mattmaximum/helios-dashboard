@@ -97,6 +97,15 @@ export default function App() {
     description: 'Quiet geomagnetic conditions',
   };
 
+  const stormLevelNum = parseInt((stormLevel.code || 'G0').replace('G', ''));
+  const isAlert = stormLevelNum >= 2;
+
+  const windSpeed = data.currentSolarWind?.speed ?? 0;
+  const windAccent =
+    windSpeed > 600 ? '#FF6B35' :
+    windSpeed > 400 ? '#FBBF24' :
+    '#00FF94';
+
   const lastUpdatedMs = data.currentSolarWind?.timestamp
     ? new Date(data.currentSolarWind.timestamp).getTime()
     : data.lastUpdated;
@@ -108,9 +117,9 @@ export default function App() {
     : new Date(data.lastUpdated).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
   return (
-    <div className="min-h-screen aurora-bg">
+    <div className={`min-h-screen aurora-bg${isAlert ? ' aurora-alert-mode' : ''}`}>
       {/* Header bar */}
-      <header className="sticky top-0 z-50 border-b border-gray-800/40 bg-black/80 backdrop-blur-lg">
+      <header className={`sticky top-0 z-50 border-b bg-black/80 backdrop-blur-lg transition-colors duration-[3000ms] ${isAlert ? 'border-red-900/50' : 'border-gray-800/40'}`}>
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             {/* Logo mark */}
@@ -166,7 +175,7 @@ export default function App() {
             value={data.currentSolarWind?.speed != null ? data.currentSolarWind.speed.toString() : '—'}
             unit="km/s"
             icon={Wind}
-            accentColor="#00FF94"
+            accentColor={windAccent}
           />
           <MetricCard
             title="Solar Wind Density"

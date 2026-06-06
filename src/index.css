@@ -110,6 +110,8 @@ body {
 .aurora-bg {
   position: relative;
   overflow: hidden;
+  background: linear-gradient(180deg, #030712 0%, #060c18 50%, #0a0e1a 100%);
+  transition: background 3s ease-in-out;
 }
 .aurora-bg::before {
   content: '';
@@ -124,8 +126,64 @@ body {
   pointer-events: none;
 }
 
+/* Storm alert mode — crimson temperature shift */
+.aurora-alert-mode {
+  background: linear-gradient(180deg, #0d0305 0%, #170810 50%, #0d0305 100%);
+}
+
 @keyframes aurora-drift {
   0% { transform: translate(0, 0) rotate(0deg); }
   50% { transform: translate(-2%, 1%) rotate(1deg); }
   100% { transform: translate(1%, -1%) rotate(-1deg); }
+}
+
+/* ============================================================
+   Kp Gauge pulse animations (keyed to G-scale)
+   G0/G1 = static, G2 = 2s, G3 = 1.2s, G4/G5 = 0.6s
+   ============================================================ */
+@keyframes pulse-g2 {
+  0%, 100% { opacity: 0.9; box-shadow: 0 0 10px rgba(250, 204, 21, 0.3); }
+  50%       { opacity: 1;   box-shadow: 0 0 22px rgba(250, 204, 21, 0.55); }
+}
+
+@keyframes pulse-g3 {
+  0%, 100% { opacity: 0.88; box-shadow: 0 0 12px rgba(255, 140, 66, 0.4); }
+  50%       { opacity: 1;    box-shadow: 0 0 28px rgba(255, 140, 66, 0.65); }
+}
+
+@keyframes pulse-g4 {
+  0%, 100% { opacity: 0.85; box-shadow: 0 0 16px rgba(239, 68, 68, 0.45); }
+  50%       { opacity: 1;    box-shadow: 0 0 36px rgba(239, 68, 68, 0.75); }
+}
+
+.kp-glow-pulse-g2 { animation: pulse-g2 2s ease-in-out infinite; }
+.kp-glow-pulse-g3 { animation: pulse-g3 1.2s ease-in-out infinite; }
+.kp-glow-pulse-g4 { animation: pulse-g4 0.6s ease-in-out infinite; }
+
+/* ============================================================
+   Chart animate-in
+   ============================================================ */
+@keyframes chart-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.chart-animate-in {
+  animation: chart-fade-in 0.7s ease-out both;
+}
+
+/* ============================================================
+   Accessibility — prefers-reduced-motion
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  [class*='animate-pulse'],
+  [class*='kp-glow-pulse'],
+  .chart-animate-in {
+    animation: none !important;
+  }
+  /* Static glow fallback for high G-scale when animation is off */
+  .kp-glow-pulse-g3,
+  .kp-glow-pulse-g4 {
+    box-shadow: 0 0 24px rgba(239, 68, 68, 0.5) !important;
+  }
 }

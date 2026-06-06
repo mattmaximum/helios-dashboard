@@ -131,7 +131,7 @@ export default function SolarCharts({ kpIndex, xrayFlux, solarWind }: Props) {
       </div>
 
       {/* KP Index Chart */}
-      <div className="rounded-2xl border border-gray-800/40 bg-gray-950/50 p-6 backdrop-blur-sm">
+      <div className="chart-animate-in rounded-2xl border border-gray-800/40 bg-gray-950/50 p-6 backdrop-blur-sm" style={{ animationDelay: '0ms' }}>
         <h3 className="mb-1 text-sm font-semibold uppercase tracking-widest text-gray-400">
           Kp-index ({rangeLabel})
         </h3>
@@ -157,7 +157,7 @@ export default function SolarCharts({ kpIndex, xrayFlux, solarWind }: Props) {
       </div>
 
       {/* X-ray Flux Chart */}
-      <div className="rounded-2xl border border-gray-800/40 bg-gray-950/50 p-6 backdrop-blur-sm">
+      <div className="chart-animate-in rounded-2xl border border-gray-800/40 bg-gray-950/50 p-6 backdrop-blur-sm" style={{ animationDelay: '120ms' }}>
         <h3 className="mb-1 text-sm font-semibold uppercase tracking-widest text-gray-400">
           X-ray Flux ({rangeLabel})
         </h3>
@@ -184,7 +184,7 @@ export default function SolarCharts({ kpIndex, xrayFlux, solarWind }: Props) {
       </div>
 
       {/* Solar Wind Speed + Density */}
-      <div className="rounded-2xl border border-gray-800/40 bg-gray-950/50 p-6 backdrop-blur-sm">
+      <div className="chart-animate-in rounded-2xl border border-gray-800/40 bg-gray-950/50 p-6 backdrop-blur-sm" style={{ animationDelay: '240ms' }}>
         <h3 className="mb-1 text-sm font-semibold uppercase tracking-widest text-gray-400">
           Solar Wind Speed &amp; Density ({rangeLabel})
         </h3>
@@ -203,7 +203,7 @@ export default function SolarCharts({ kpIndex, xrayFlux, solarWind }: Props) {
       </div>
 
       {/* Bz Component */}
-      <div className="rounded-2xl border border-gray-800/40 bg-gray-950/50 p-6 backdrop-blur-sm">
+      <div className="chart-animate-in rounded-2xl border border-gray-800/40 bg-gray-950/50 p-6 backdrop-blur-sm" style={{ animationDelay: '360ms' }}>
         <h3 className="mb-1 text-sm font-semibold uppercase tracking-widest text-gray-400">
           Interplanetary Magnetic Field ({rangeLabel})
         </h3>
