@@ -1,5 +1,20 @@
+import { useState } from 'react';
 import { SolarEvent, EventSeverity } from '@/data/solarData';
 import InfoTip from './InfoTip';
+
+type TimeRange = '24h' | '1w' | '1m';
+
+const RANGE_MS: Record<TimeRange, number> = {
+  '24h': 24 * 60 * 60 * 1000,
+  '1w':  7  * 24 * 60 * 60 * 1000,
+  '1m':  30 * 24 * 60 * 60 * 1000,
+};
+
+const RANGE_LABEL: Record<TimeRange, string> = {
+  '24h': '24H',
+  '1w':  '1W',
+  '1m':  '1M',
+};
 
 const SEVERITY_COLOR: Record<EventSeverity, string> = {
   minor:    '#84cc16',
@@ -21,7 +36,8 @@ function relativeTime(iso: string): string {
   if (mins < 60) return `${mins}m ago`;
   const hrs = Math.floor(diffMs / 3_600_000);
   if (hrs < 24)  return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
 }
 
 function absTime(iso: string): string {
@@ -36,31 +52,55 @@ interface Props {
 }
 
 export default function SolarEventLog({ events }: Props) {
+  const [range, setRange] = useState<TimeRange>('24h');
+
+  const cutoff = Date.now() - RANGE_MS[range];
+  const visible = events.filter((e) => new Date(e.time).getTime() >= cutoff);
+
   return (
     <div className="rounded-xl border border-gray-800/40 bg-gray-950/50 backdrop-blur-sm">
       {/* Header */}
       <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b border-gray-800/40">
         <h3 className="text-sm font-semibold uppercase tracking-widest text-gray-400">
-          Solar Events
+          Solar Event History
         </h3>
-        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-gray-800 text-gray-500 uppercase tracking-wider">
-          72h
-        </span>
-        <InfoTip content="Significant solar events from the past 72 hours. Includes M1.0+ solar flares (radio/satellite impact potential), G1+ geomagnetic storm onsets (Kp ≥ 5), and active CME watches issued by NOAA SWPC. Lower-level background activity is filtered out." />
+        <InfoTip content="Significant solar events filtered by the selected time window. Includes M1.0+ solar flares (radio/satellite impact potential), G1+ geomagnetic storm onsets (Kp ≥ 5), and CME watches issued by NOAA SWPC. Lower-level background activity is filtered out." />
+
+        {/* Time range toggle */}
+        <div className="ml-auto flex items-center gap-0.5 rounded-lg border border-gray-800/60 bg-gray-900/60 p-0.5">
+          {(['24h', '1w', '1m'] as TimeRange[]).map((r) => (
+            <button
+              key={r}
+              onClick={() => setRange(r)}
+              className={`px-2.5 py-1 rounded-md text-[10px] font-semibold uppercase tracking-wider transition-all ${
+                range === r
+                  ? 'bg-gray-700 text-white'
+                  : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              {RANGE_LABEL[r]}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Scrollable event list */}
-      <div className="overflow-y-auto max-h-64 divide-y divide-gray-800/30 scrollbar-thin">
-        {events.length === 0 ? (
+      <div className="overflow-y-auto max-h-64 divide-y divide-gray-800/30">
+        {visible.length === 0 ? (
           <div className="flex items-center gap-2 px-4 py-4">
             <div className="h-1.5 w-1.5 rounded-full bg-emerald-500/70 shrink-0" />
-            <p className="text-xs text-gray-600">No significant events in the past 72 hours</p>
+            <p className="text-xs text-gray-600">
+              No significant events in the past {RANGE_LABEL[range].toLowerCase() === '24h' ? '24 hours' : RANGE_LABEL[range].toLowerCase() === '1w' ? 'week' : 'month'}
+            </p>
           </div>
         ) : (
-          events.map((event) => {
+          visible.map((event) => {
             const color = SEVERITY_COLOR[event.severity];
             return (
-              <div key={event.id} className="flex items-start gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors">
+              <div
+                key={event.id}
+                className="flex items-start gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors"
+              >
                 {/* Severity dot */}
                 <div
                   className="mt-1 h-1.5 w-1.5 rounded-full shrink-0"
@@ -70,7 +110,6 @@ export default function SolarEventLog({ events }: Props) {
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    {/* Type + badge */}
                     <span
                       className="text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0"
                       style={{

@@ -559,10 +559,11 @@ export async function fetchSolarData(): Promise<SolarData> {
   }
 
   // Solar event log — unified feed of M1.0+ flares, G1+ storm onsets, CME watches
-  const since72h = lastUpdated - 72 * 60 * 60 * 1000;
+  // Use 30-day window so the 1W/1M toggles in the UI have data to show
+  const since30d = lastUpdated - 30 * 24 * 60 * 60 * 1000;
   let flareEvents: SolarEvent[] = [];
   if (flaresResult.status === 'fulfilled') {
-    flareEvents = parseFlares(flaresResult.value, since72h);
+    flareEvents = parseFlares(flaresResult.value, since30d);
   } else {
     console.warn('[Helios] Observed-flares API failed:', flaresResult.reason instanceof Error ? flaresResult.reason.message : flaresResult.reason);
   }
@@ -595,8 +596,8 @@ export async function fetchSolarData(): Promise<SolarData> {
   }
 
   // Combine all event types, sort newest-first
-  const allAlertEvents = alertsToEvents(spaceWeatherAlerts, since72h);
-  const stormEvents = deriveStormOnsets(kpIndex, since72h);
+  const allAlertEvents = alertsToEvents(spaceWeatherAlerts, since30d);
+  const stormEvents = deriveStormOnsets(kpIndex, since30d);
   const solarEvents: SolarEvent[] = [...flareEvents, ...stormEvents, ...allAlertEvents]
     .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
 
