@@ -8,7 +8,7 @@ interface Props {
 
 export default function InfoTip({ content }: Props) {
   const [open, setOpen] = useState(false);
-  const [coords, setCoords] = useState({ top: 0, left: 0 });
+  const [coords, setCoords] = useState({ top: 0, left: 0, flipBelow: false });
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   const position = useCallback(() => {
@@ -17,7 +17,13 @@ export default function InfoTip({ content }: Props) {
     const tipWidth = 240;
     const rawLeft = r.left + r.width / 2 - tipWidth / 2;
     const clampedLeft = Math.min(Math.max(rawLeft, 8), window.innerWidth - tipWidth - 8);
-    setCoords({ top: r.top + window.scrollY - 8, left: clampedLeft });
+    // Flip below the trigger if less than 140px from the top of the viewport
+    const flipBelow = r.top < 140;
+    setCoords({
+      top: flipBelow ? r.bottom + window.scrollY + 8 : r.top + window.scrollY - 8,
+      left: clampedLeft,
+      flipBelow,
+    });
   }, []);
 
   const show = useCallback(() => { position(); setOpen(true); }, [position]);
@@ -35,11 +41,20 @@ export default function InfoTip({ content }: Props) {
 
   const tooltip = open ? createPortal(
     <div
-      style={{ position: 'absolute', top: coords.top, left: coords.left, transform: 'translateY(-100%)' }}
+      style={{
+        position: 'absolute',
+        top: coords.top,
+        left: coords.left,
+        transform: coords.flipBelow ? 'none' : 'translateY(-100%)',
+      }}
       className="z-[9999] w-60 rounded-lg border border-gray-700/70 bg-gray-900/98 px-3 py-2.5 text-xs leading-relaxed text-gray-300 shadow-2xl backdrop-blur-sm pointer-events-none"
     >
       {content}
-      <div className="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-gray-700/70" />
+      {/* Arrow points toward the trigger */}
+      {coords.flipBelow
+        ? <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-b-gray-700/70" />
+        : <div className="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-gray-700/70" />
+      }
     </div>,
     document.body
   ) : null;
