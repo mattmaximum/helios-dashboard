@@ -27,10 +27,10 @@ const BUCKET_MS: Record<TimeRange, number> = {
   '1w': 2 * 60 * 60 * 1000,
 };
 
-// Custom tooltip
-function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color?: string }[]; label?: string }) {
+// Custom tooltip — label is a numeric ms timestamp when XAxis type="number"
+function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color?: string }[]; label?: number }) {
   if (!active || !payload?.length) return null;
-  const timeStr = label ? new Date(label).toLocaleString() : '';
+  const timeStr = label != null ? new Date(label).toLocaleString() : '';
   return (
     <div className="rounded-lg border border-gray-700/60 bg-gray-950/95 px-3 py-2 text-xs shadow-xl backdrop-blur-sm">
       {timeStr && <p className="mb-1 font-semibold text-gray-300">{timeStr}</p>}
@@ -41,16 +41,6 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
       ))}
     </div>
   );
-}
-
-function formatTime(dateStr: string) {
-  const d = new Date(dateStr);
-  return `${d.getUTCHours().toString().padStart(2, '0')}:${d.getUTCMinutes().toString().padStart(2, '0')}`;
-}
-
-function formatDate(dateStr: string) {
-  const d = new Date(dateStr);
-  return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
 }
 
 function filterByRange<T>(data: T[], rangeMs: number, getTime: (d: T) => string): T[] {
@@ -112,34 +102,37 @@ export default function SolarCharts({ kpIndex, xrayFlux, solarWind }: Props) {
     bucketMs
   );
 
-  const timeFmt = range === '1w' ? formatDate : formatTime;
+  // Use numeric ms timestamps so Recharts has a continuous linear scale.
+  // String time labels (e.g. "14:30") repeat across days and cause tooltip/dot misalignment.
+  const tickFormatter = (ms: number) => {
+    const d = new Date(ms);
+    return range === '1w'
+      ? `${d.getUTCMonth() + 1}/${d.getUTCDate()}`
+      : `${d.getUTCHours().toString().padStart(2, '0')}:${d.getUTCMinutes().toString().padStart(2, '0')}`;
+  };
 
   const kpData = filteredKp.map((d) => ({
-    time: timeFmt(d.timestamp),
+    ts: new Date(d.timestamp).getTime(),
     kp: d.kp ?? null,
-    fullTime: d.timestamp,
   }));
 
   const xrayData = filteredXray.map((d) => ({
-    time: timeFmt(d.time),
+    ts: new Date(d.time).getTime(),
     flux: d.flux ?? null,
     class: d.class,
-    fullTime: d.time,
   }));
 
   const windData = filteredWind.map((d) => ({
-    time: timeFmt(d.timestamp),
+    ts: new Date(d.timestamp).getTime(),
     speed: d.speed,
     density: d.density,
-    fullTime: d.timestamp,
   }));
 
   const bzData = filteredWind.map((d) => ({
-    time: timeFmt(d.timestamp),
+    ts: new Date(d.timestamp).getTime(),
     bz: d.bz,
     bx: d.bx,
     by: d.by,
-    fullTime: d.timestamp,
   }));
 
   const rangeButtons = (
@@ -182,7 +175,7 @@ export default function SolarCharts({ kpIndex, xrayFlux, solarWind }: Props) {
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#1a1f2e" />
-            <XAxis dataKey="time" stroke="#374151" tick={{ fontSize: 10 }} tickMargin={4} interval="preserveStartEnd" />
+            <XAxis dataKey="ts" type="number" scale="time" domain={['dataMin', 'dataMax']} tickFormatter={tickFormatter} stroke="#374151" tick={{ fontSize: 10 }} tickMargin={4} interval="preserveStartEnd" />
             <YAxis domain={[0, 9]} stroke="#374151" tick={{ fontSize: 10 }} label={{ value: 'Kp', angle: -90, position: 'insideLeft', style: { fill: '#6b7280', fontSize: 11 } }} />
             <Tooltip content={<ChartTooltip />} />
             <ReferenceLine y={5} stroke="#eab308" strokeDasharray="4 4" label={{ value: 'G2', fill: '#eab308', fontSize: 10 }} />
@@ -209,7 +202,7 @@ export default function SolarCharts({ kpIndex, xrayFlux, solarWind }: Props) {
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#1a1f2e" />
-            <XAxis dataKey="time" stroke="#374151" tick={{ fontSize: 10 }} tickMargin={4} interval="preserveStartEnd" />
+            <XAxis dataKey="ts" type="number" scale="time" domain={['dataMin', 'dataMax']} tickFormatter={tickFormatter} stroke="#374151" tick={{ fontSize: 10 }} tickMargin={4} interval="preserveStartEnd" />
             <YAxis scale="log" domain={[1e-9, 1e-4]} tickFormatter={(v) => `${v.toExponential(0)}`} stroke="#374151" tick={{ fontSize: 10 }} />
             <Tooltip content={<ChartTooltip />} />
             <ReferenceLine y={1e-6} stroke="#eab308" strokeDasharray="4 4" label={{ value: 'C-class', fill: '#eab308', fontSize: 10 }} />
@@ -230,7 +223,7 @@ export default function SolarCharts({ kpIndex, xrayFlux, solarWind }: Props) {
         <ResponsiveContainer width="100%" height={200}>
           <AreaChart data={windData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#1a1f2e" />
-            <XAxis dataKey="time" stroke="#374151" tick={{ fontSize: 10 }} tickMargin={4} interval="preserveStartEnd" />
+            <XAxis dataKey="ts" type="number" scale="time" domain={['dataMin', 'dataMax']} tickFormatter={tickFormatter} stroke="#374151" tick={{ fontSize: 10 }} tickMargin={4} interval="preserveStartEnd" />
             <YAxis yAxisId="left" domain={[200, 800]} stroke="#374151" tick={{ fontSize: 10 }} />
             <YAxis yAxisId="right" orientation="right" domain={[0, 20]} stroke="#374151" tick={{ fontSize: 10 }} />
             <Tooltip content={<ChartTooltip />} />
@@ -250,7 +243,7 @@ export default function SolarCharts({ kpIndex, xrayFlux, solarWind }: Props) {
         <ResponsiveContainer width="100%" height={200}>
           <AreaChart data={bzData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#1a1f2e" />
-            <XAxis dataKey="time" stroke="#374151" tick={{ fontSize: 10 }} tickMargin={4} interval="preserveStartEnd" />
+            <XAxis dataKey="ts" type="number" scale="time" domain={['dataMin', 'dataMax']} tickFormatter={tickFormatter} stroke="#374151" tick={{ fontSize: 10 }} tickMargin={4} interval="preserveStartEnd" />
             <YAxis domain={[-20, 20]} stroke="#374151" tick={{ fontSize: 10 }} />
             <Tooltip content={<ChartTooltip />} />
             <ReferenceLine y={0} stroke="#4a4f5e" strokeWidth={1} />
