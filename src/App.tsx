@@ -9,6 +9,7 @@ import SolarCharts from './components/SolarCharts';
 import SchumannResonance from './components/SchumannResonance';
 import SolarRating from './components/SolarRating';
 import SolarForecast from './components/SolarForecast';
+import SolarEventLog from './components/SolarEventLog';
 
 const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
@@ -217,6 +218,7 @@ export default function App() {
               f107={data.f107}
             />
             <LiveSun />
+            <SolarEventLog events={data.solarEvents} />
           </div>
         </div>
 

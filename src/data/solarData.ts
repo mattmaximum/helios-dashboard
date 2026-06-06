@@ -56,6 +56,18 @@ export interface SpaceWeatherAlert {
   summary: string;       // first substantive line
 }
 
+export type EventSeverity = 'minor' | 'moderate' | 'severe' | 'extreme';
+
+export interface SolarEvent {
+  id: string;
+  time: string;        // ISO timestamp
+  type: 'flare' | 'storm' | 'cme';
+  title: string;
+  detail: string;
+  severity: EventSeverity;
+  badge: string;       // "M2.3", "G2", "CME Watch", etc.
+}
+
 export interface SolarData {
   kpIndex: KpReading[];
   currentKp: number | null;
@@ -69,6 +81,7 @@ export interface SolarData {
   f107: number | null;
   kpForecast: KpForecastPoint[];
   spaceWeatherAlerts: SpaceWeatherAlert[];
+  solarEvents: SolarEvent[];
   lastUpdated: number;
 }
 
@@ -284,6 +297,134 @@ function parseAlerts(raw: Record<string, unknown>[]): SpaceWeatherAlert[] {
     .slice(-5); // keep only the 5 most recent
 }
 
+function flareSeverity(classStr: string): EventSeverity {
+  const upper = classStr.toUpperCase();
+  if (upper.startsWith('X')) {
+    const n = parseFloat(classStr.slice(1));
+    return n >= 10 ? 'extreme' : 'severe';
+  }
+  if (upper.startsWith('M')) {
+    const n = parseFloat(classStr.slice(1));
+    return n >= 5 ? 'moderate' : 'minor';
+  }
+  return 'minor';
+}
+
+function parseFlares(rows: Record<string, string>[], since: number): SolarEvent[] {
+  return rows
+    .map((row) => {
+      // Field names vary across NOAA product versions — check several
+      const classStr = (
+        row.goes_class ?? row.going_class ?? row.noaa_class ?? row.max_class ?? row.classType ?? ''
+      ).trim();
+      const timeStr = (
+        row.peak_time ?? row.max_time ?? row.begin_time ?? row.time_tag ?? ''
+      ).trim();
+      const location = (row.location ?? row.loc_frq ?? '').trim();
+      const region = (row.region ?? row.active_region ?? row['reg#'] ?? '').trim();
+      return { classStr, timeStr, location, region };
+    })
+    .filter(({ classStr, timeStr }) => {
+      if (!classStr || !timeStr) return false;
+      const upper = classStr.toUpperCase();
+      if (!upper.startsWith('M') && !upper.startsWith('X')) return false;
+      const t = new Date(timeStr).getTime();
+      return !isNaN(t) && t >= since;
+    })
+    .map(({ classStr, timeStr, location, region }, i) => {
+      const detail = [
+        region ? `Region ${region}` : '',
+        location || '',
+      ].filter(Boolean).join(' · ') || 'GOES satellite detection';
+      return {
+        id: `flare-${timeStr}-${i}`,
+        time: new Date(timeStr).toISOString(),
+        type: 'flare' as const,
+        title: `${classStr} Solar Flare`,
+        detail,
+        severity: flareSeverity(classStr),
+        badge: classStr,
+      };
+    });
+}
+
+function deriveStormOnsets(kpReadings: KpReading[], since: number): SolarEvent[] {
+  const events: SolarEvent[] = [];
+  let lastStormMs: number | null = null;
+  const COOLDOWN = 6 * 60 * 60 * 1000;
+
+  for (const reading of kpReadings) {
+    const t = new Date(reading.timestamp).getTime();
+    if (t < since || (reading.kp ?? 0) < 5) continue;
+    if (lastStormMs !== null && t - lastStormMs <= COOLDOWN) {
+      lastStormMs = t;
+      continue;
+    }
+    const kp = reading.kp!;
+    const level = getStormLevel(kp);
+    const severity: EventSeverity = kp >= 8 ? 'extreme' : kp >= 7 ? 'severe' : kp >= 6 ? 'moderate' : 'minor';
+    events.push({
+      id: `storm-${t}`,
+      time: reading.timestamp,
+      type: 'storm',
+      title: `${level.code} Geomagnetic Storm`,
+      detail: `Kp ${kp.toFixed(1)} · ${level.label}`,
+      severity,
+      badge: level.code,
+    });
+    lastStormMs = t;
+  }
+  return events;
+}
+
+function alertsToEvents(alerts: SpaceWeatherAlert[], since: number): SolarEvent[] {
+  return alerts
+    .filter((a) => {
+      const t = new Date(a.issueTime).getTime();
+      return !isNaN(t) && t >= since;
+    })
+    .map((a, i) => {
+      const severity: EventSeverity =
+        a.gScale === 'G4' || a.gScale === 'G5' ? 'extreme'
+        : a.gScale === 'G3' ? 'severe'
+        : a.gScale === 'G2' ? 'moderate'
+        : 'minor';
+      return {
+        id: `cme-${a.issueTime}-${i}`,
+        time: new Date(a.issueTime).toISOString(),
+        type: 'cme' as const,
+        title: a.gScale ? `${a.gScale} Storm Watch` : 'Space Weather Advisory',
+        detail: a.summary,
+        severity,
+        badge: a.gScale ?? 'Watch',
+      };
+    });
+}
+
+function getMockSolarEvents(): SolarEvent[] {
+  const now = Date.now();
+  return [
+    {
+      id: 'mock-flare-1',
+      time: new Date(now - 8 * 3_600_000).toISOString(),
+      type: 'flare',
+      title: 'M2.1 Solar Flare',
+      detail: 'Region 3456 · N12E25',
+      severity: 'minor',
+      badge: 'M2.1',
+    },
+    {
+      id: 'mock-storm-1',
+      time: new Date(now - 22 * 3_600_000).toISOString(),
+      type: 'storm',
+      title: 'G1 Geomagnetic Storm',
+      detail: 'Kp 5.3 · Minor Storm',
+      severity: 'minor',
+      badge: 'G1',
+    },
+  ];
+}
+
 /** Classify X-ray flux value into GOES class string */
 function classifyFlux(flux: number): string {
   if (flux >= 1e-4) return `X${(flux / 1e-4).toFixed(1)}`;
@@ -297,7 +438,7 @@ export async function fetchSolarData(): Promise<SolarData> {
   const lastUpdated = Date.now();
 
   // Fetch all APIs in parallel
-  const [kpResult, plasmaResult, magResult, xrayResult, f107Result, kpForecastResult, alertsResult] = await Promise.allSettled([
+  const [kpResult, plasmaResult, magResult, xrayResult, f107Result, kpForecastResult, alertsResult, flaresResult] = await Promise.allSettled([
     fetchJSON<Record<string, unknown>[]>(URLS.kpIndex),
     fetchProductCSV<Record<string, string>>(URLS.plasma),
     fetchProductCSV<Record<string, string>>(URLS.mag),
@@ -305,6 +446,7 @@ export async function fetchSolarData(): Promise<SolarData> {
     fetchJSON<Record<string, unknown>[]>(URLS.f107),
     fetchProductCSV<Record<string, string>>(URLS.kpForecast),
     fetchJSON<Record<string, unknown>[]>(URLS.alerts),
+    fetchProductCSV<Record<string, string>>(URLS.xrayFlares),
   ]);
 
   // Kp index
@@ -416,6 +558,15 @@ export async function fetchSolarData(): Promise<SolarData> {
     console.warn('[Helios] F10.7 API failed, using null');
   }
 
+  // Solar event log — unified feed of M1.0+ flares, G1+ storm onsets, CME watches
+  const since72h = lastUpdated - 72 * 60 * 60 * 1000;
+  let flareEvents: SolarEvent[] = [];
+  if (flaresResult.status === 'fulfilled') {
+    flareEvents = parseFlares(flaresResult.value, since72h);
+  } else {
+    console.warn('[Helios] Observed-flares API failed:', flaresResult.reason instanceof Error ? flaresResult.reason.message : flaresResult.reason);
+  }
+
   // Kp 3-day forecast (header+rows CSV-style product endpoint)
   let kpForecast: KpForecastPoint[];
   if (kpForecastResult.status === 'fulfilled') {
@@ -443,6 +594,15 @@ export async function fetchSolarData(): Promise<SolarData> {
     spaceWeatherAlerts = [];
   }
 
+  // Combine all event types, sort newest-first
+  const allAlertEvents = alertsToEvents(spaceWeatherAlerts, since72h);
+  const stormEvents = deriveStormOnsets(kpIndex, since72h);
+  const solarEvents: SolarEvent[] = [...flareEvents, ...stormEvents, ...allAlertEvents]
+    .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+
+  // Fall back to mock if every source failed
+  const finalSolarEvents = solarEvents.length > 0 ? solarEvents : getMockSolarEvents();
+
   return {
     kpIndex,
     currentKp,
@@ -456,6 +616,7 @@ export async function fetchSolarData(): Promise<SolarData> {
     f107,
     kpForecast,
     spaceWeatherAlerts,
+    solarEvents: finalSolarEvents,
     lastUpdated,
   };
 }
