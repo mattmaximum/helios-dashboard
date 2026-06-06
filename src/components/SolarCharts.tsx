@@ -19,6 +19,13 @@ const TIME_RANGES: { key: TimeRange; label: string; ms: number }[] = [
   { key: '1w', label: '1 week', ms: 7 * 24 * 60 * 60 * 1000 },
 ];
 
+// 15-minute bucket for 24h/72h, 2-hour bucket for 1w
+const BUCKET_MS: Record<TimeRange, number> = {
+  '24h': 15 * 60 * 1000,
+  '72h': 30 * 60 * 1000,
+  '1w': 2 * 60 * 60 * 1000,
+};
+
 // Custom tooltip
 function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color?: string }[]; label?: string }) {
   if (!active || !payload?.length) return null;
@@ -45,10 +52,42 @@ function formatDate(dateStr: string) {
   return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
 }
 
-/** Filter data to only include points within the given time range from now */
 function filterByRange<T>(data: T[], rangeMs: number, getTime: (d: T) => string): T[] {
   const cutoff = Date.now() - rangeMs;
   return data.filter((d) => new Date(getTime(d)).getTime() >= cutoff);
+}
+
+function avg(values: (number | null)[]): number | null {
+  const valid = values.filter((v): v is number => v != null && v > 0);
+  return valid.length > 0 ? valid.reduce((a, b) => a + b, 0) / valid.length : null;
+}
+
+function avgAny(values: (number | null)[]): number | null {
+  const valid = values.filter((v): v is number => v != null);
+  return valid.length > 0 ? valid.reduce((a, b) => a + b, 0) / valid.length : null;
+}
+
+/** Average solar wind readings into fixed-width time buckets to remove noise and API gaps */
+function downsampleWind(data: SolarWindData[], bucketMs: number): SolarWindData[] {
+  if (data.length === 0) return data;
+  const map = new Map<number, SolarWindData[]>();
+  for (const item of data) {
+    const t = new Date(item.timestamp).getTime();
+    const key = Math.floor(t / bucketMs) * bucketMs;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(item);
+  }
+  return Array.from(map.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([key, items]) => ({
+      timestamp: new Date(key).toISOString(),
+      speed: avg(items.map((d) => d.speed)),
+      density: avg(items.map((d) => d.density)),
+      temperature: avgAny(items.map((d) => d.temperature)),
+      bz: avgAny(items.map((d) => d.bz)),
+      bx: avgAny(items.map((d) => d.bx)),
+      by: avgAny(items.map((d) => d.by)),
+    }));
 }
 
 interface Props {
@@ -63,45 +102,42 @@ export default function SolarCharts({ kpIndex, xrayFlux, solarWind }: Props) {
   const activeRange = TIME_RANGES.find((r) => r.key === range)!;
   const rangeMs = activeRange.ms;
   const rangeLabel = activeRange.label;
+  const bucketMs = BUCKET_MS[range];
 
-  // Filter data by time range
   const filteredKp = filterByRange(kpIndex, rangeMs, (d) => d.timestamp);
   const filteredXray = filterByRange(xrayFlux, rangeMs, (d) => d.time);
-  const filteredWind = filterByRange(solarWind, rangeMs, (d) => d.timestamp);
+  const filteredWind = downsampleWind(
+    filterByRange(solarWind, rangeMs, (d) => d.timestamp),
+    bucketMs
+  );
 
-  // Decide which time formatter to use
   const timeFmt = range === '1w' ? formatDate : formatTime;
 
-  // Prepare KP chart data
   const kpData = filteredKp.map((d) => ({
     time: timeFmt(d.timestamp),
-    kp: d.kp ?? 0,
+    kp: d.kp ?? null,
     fullTime: d.timestamp,
   }));
 
-  // Prepare X-ray chart data
   const xrayData = filteredXray.map((d) => ({
     time: timeFmt(d.time),
-    flux: d.flux ?? 0,
+    flux: d.flux ?? null,
     class: d.class,
-    isFlare: (d.flux ?? 0) > 1e-6,
     fullTime: d.time,
   }));
 
-  // Prepare solar wind chart data
   const windData = filteredWind.map((d) => ({
     time: timeFmt(d.timestamp),
-    speed: d.speed ?? 0,
-    density: d.density ?? 0,
+    speed: d.speed,
+    density: d.density,
     fullTime: d.timestamp,
   }));
 
-  // Bz chart data
   const bzData = filteredWind.map((d) => ({
     time: timeFmt(d.timestamp),
-    bz: d.bz ?? 0,
-    bx: d.bx ?? 0,
-    by: d.by ?? 0,
+    bz: d.bz,
+    bx: d.bx,
+    by: d.by,
     fullTime: d.timestamp,
   }));
 
@@ -125,7 +161,6 @@ export default function SolarCharts({ kpIndex, xrayFlux, solarWind }: Props) {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Range toggle bar */}
       <div className="flex items-center justify-end">
         {rangeButtons}
       </div>
@@ -151,7 +186,7 @@ export default function SolarCharts({ kpIndex, xrayFlux, solarWind }: Props) {
             <ReferenceLine y={5} stroke="#eab308" strokeDasharray="4 4" label={{ value: 'G2', fill: '#eab308', fontSize: 10 }} />
             <ReferenceLine y={7} stroke="#ef4444" strokeDasharray="4 4" label={{ value: 'G3', fill: '#ef4444', fontSize: 10 }} />
             <ReferenceLine y={8} stroke="#dc2626" strokeDasharray="4 4" label={{ value: 'G5', fill: '#dc2626', fontSize: 10 }} />
-            <Area type="monotone" dataKey="kp" stroke="#FF6B35" strokeWidth={2} fill="url(#kpGrad)" name="Kp" />
+            <Area type="monotone" dataKey="kp" stroke="#FF6B35" strokeWidth={2} fill="url(#kpGrad)" name="Kp" connectNulls={false} />
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -174,11 +209,10 @@ export default function SolarCharts({ kpIndex, xrayFlux, solarWind }: Props) {
             <XAxis dataKey="time" stroke="#374151" tick={{ fontSize: 10 }} tickMargin={4} interval="preserveStartEnd" />
             <YAxis scale="log" domain={[1e-9, 1e-4]} tickFormatter={(v) => `${v.toExponential(0)}`} stroke="#374151" tick={{ fontSize: 10 }} />
             <Tooltip content={<ChartTooltip />} />
-            {/* Flare class thresholds */}
             <ReferenceLine y={1e-6} stroke="#eab308" strokeDasharray="4 4" label={{ value: 'C-class', fill: '#eab308', fontSize: 10 }} />
             <ReferenceLine y={1e-5} stroke="#f97316" strokeDasharray="4 4" label={{ value: 'M-class', fill: '#f97316', fontSize: 10 }} />
             <ReferenceLine y={1e-4} stroke="#ef4444" strokeDasharray="4 4" label={{ value: 'X-class', fill: '#ef4444', fontSize: 10 }} />
-            <Area type="monotone" dataKey="flux" stroke="#FF6B35" strokeWidth={2} fill="url(#xrayGrad)" name="Flux" />
+            <Area type="monotone" dataKey="flux" stroke="#FF6B35" strokeWidth={2} fill="url(#xrayGrad)" name="Flux" connectNulls={false} />
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -188,16 +222,16 @@ export default function SolarCharts({ kpIndex, xrayFlux, solarWind }: Props) {
         <h3 className="mb-1 text-sm font-semibold uppercase tracking-widest text-gray-400">
           Solar Wind Speed &amp; Density ({rangeLabel})
         </h3>
-        <p className="mb-4 text-xs text-gray-600">Speed (km/s, solid) and Density (p/cm³, dashed)</p>
+        <p className="mb-4 text-xs text-gray-600">Speed (km/s, solid) and Density (p/cm³, dashed) — 15-min averages</p>
         <ResponsiveContainer width="100%" height={200}>
           <AreaChart data={windData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#1a1f2e" />
             <XAxis dataKey="time" stroke="#374151" tick={{ fontSize: 10 }} tickMargin={4} interval="preserveStartEnd" />
-            <YAxis yAxisId="left" domain={[0, 700]} stroke="#374151" tick={{ fontSize: 10 }} />
+            <YAxis yAxisId="left" domain={[200, 800]} stroke="#374151" tick={{ fontSize: 10 }} />
             <YAxis yAxisId="right" orientation="right" domain={[0, 20]} stroke="#374151" tick={{ fontSize: 10 }} />
             <Tooltip content={<ChartTooltip />} />
-            <Area yAxisId="left" type="monotone" dataKey="speed" stroke="#00FF94" strokeWidth={2} fill="#00FF94" fillOpacity={0.05} name="Speed km/s" />
-            <Area yAxisId="right" type="monotone" dataKey="density" stroke="#00D4AA" strokeWidth={2} strokeDasharray="5 5" fill="#00D4AA" fillOpacity={0.05} name="Density p/cm³" />
+            <Area yAxisId="left" type="monotone" dataKey="speed" stroke="#00FF94" strokeWidth={2} fill="#00FF94" fillOpacity={0.06} name="Speed km/s" connectNulls={false} />
+            <Area yAxisId="right" type="monotone" dataKey="density" stroke="#00D4AA" strokeWidth={1.5} strokeDasharray="5 5" fill="none" name="Density p/cm³" connectNulls={false} />
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -207,17 +241,17 @@ export default function SolarCharts({ kpIndex, xrayFlux, solarWind }: Props) {
         <h3 className="mb-1 text-sm font-semibold uppercase tracking-widest text-gray-400">
           Interplanetary Magnetic Field ({rangeLabel})
         </h3>
-        <p className="mb-4 text-xs text-gray-600">Southward Bz drives geomagnetic storms (red = negative)</p>
+        <p className="mb-4 text-xs text-gray-600">Southward Bz drives geomagnetic storms — 15-min averages</p>
         <ResponsiveContainer width="100%" height={200}>
           <AreaChart data={bzData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#1a1f2e" />
             <XAxis dataKey="time" stroke="#374151" tick={{ fontSize: 10 }} tickMargin={4} interval="preserveStartEnd" />
-            <YAxis domain={[-15, 15]} stroke="#374151" tick={{ fontSize: 10 }} />
+            <YAxis domain={[-20, 20]} stroke="#374151" tick={{ fontSize: 10 }} />
             <Tooltip content={<ChartTooltip />} />
             <ReferenceLine y={0} stroke="#4a4f5e" strokeWidth={1} />
-            <Area type="monotone" dataKey="bz" name="Bz" stroke="#ef4444" fill="#ef4444" fillOpacity={0.15} strokeWidth={1.5} />
-            <Area type="monotone" dataKey="bx" name="Bx" stroke="#22d3ee" fill="#22d3ee" fillOpacity={0.05} strokeWidth={1} />
-            <Area type="monotone" dataKey="by" name="By" stroke="#a855f7" fill="#a855f7" fillOpacity={0.05} strokeWidth={1} />
+            <Area type="basis" dataKey="bz" name="Bz" stroke="#ef4444" fill="#ef4444" fillOpacity={0.12} strokeWidth={1.5} connectNulls={false} />
+            <Area type="basis" dataKey="bx" name="Bx" stroke="#22d3ee" fill="none" strokeWidth={1} connectNulls={false} />
+            <Area type="basis" dataKey="by" name="By" stroke="#a855f7" fill="none" strokeWidth={1} connectNulls={false} />
           </AreaChart>
         </ResponsiveContainer>
         <div className="mt-2 flex flex-wrap gap-4">
