@@ -159,47 +159,43 @@ export default function App() {
 
       {/* Main content */}
       <main className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
-        {/* === Row: MetricCards === */}
-        <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <MetricCard
-            title="Solar Wind Speed"
-            value={data.currentSolarWind?.speed != null ? data.currentSolarWind.speed.toString() : '—'}
-            unit="km/s"
-            icon={Wind}
-            accentColor={windAccent}
-            tooltip="How fast charged particles from the Sun are traveling toward Earth. Normal is 300–500 km/s. Above 600 km/s the solar wind is fast enough to compress Earth's magnetosphere and amplify any geomagnetic storm in progress."
-          />
-          <MetricCard
-            title="Solar Wind Density"
-            value={data.currentSolarWind?.density != null ? data.currentSolarWind.density.toFixed(1) : '—'}
-            unit="p/cm³"
-            icon={Activity}
-            accentColor="#00D4AA"
-            tooltip="How many protons per cubic centimeter are packed into the solar wind. Typical is 3–10 p/cm³. High density amplifies storm intensity — a dense, fast wind hitting a southward Bz is the worst-case combination for geomagnetic storms."
-          />
-          <MetricCard
-            title="Bz Component"
-            value={data.currentSolarWind?.bz != null ? data.currentSolarWind.bz.toFixed(1) : '—'}
-            unit="nT"
-            icon={ThermometerSun}
-            accentColor="#ef4444"
-            tooltip="The north-south tilt of the Sun's magnetic field as it reaches Earth. When Bz goes negative (southward), it links with Earth's magnetic field and lets solar energy pour through — the primary trigger for geomagnetic storms. Even moderate solar wind can cause a strong storm if Bz is deeply negative."
-          />
-          <MetricCard
-            title="X-Ray Flux Class"
-            value={data.currentXrayClass}
-            unit="GOES"
-            icon={Zap}
-            accentColor="#FF6B35"
-            tooltip="The intensity of the latest solar flare measured by GOES satellites. Classes go B → C → M → X, each 10× stronger than the last. C-class is minor background activity. M-class can cause brief radio blackouts. X-class flares can knock out HF radio globally and energize the Van Allen belts for days."
-          />
-        </div>
-
-        {/* === Row: KpGauge + StormStatus | LiveSun === */}
+        {/* === Row: [KpGauge + MetricCards + StormStatus] | LiveSun === */}
         <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-stretch">
-          <div className="flex flex-col gap-4">
-            <div className="flex-1 min-h-0">
-              <KpGauge currentKp={currentKpNum} />
+          <div className="flex flex-col gap-3">
+            <KpGauge currentKp={currentKpNum} />
+            <div className="grid grid-cols-2 gap-3">
+              <MetricCard
+                title="Solar Wind Speed"
+                value={data.currentSolarWind?.speed != null ? data.currentSolarWind.speed.toString() : '—'}
+                unit="km/s"
+                icon={Wind}
+                accentColor={windAccent}
+                tooltip="How fast charged particles from the Sun are traveling toward Earth. Normal is 300–500 km/s. Above 600 km/s the solar wind is fast enough to compress Earth's magnetosphere and amplify any geomagnetic storm in progress."
+              />
+              <MetricCard
+                title="Solar Wind Density"
+                value={data.currentSolarWind?.density != null ? data.currentSolarWind.density.toFixed(1) : '—'}
+                unit="p/cm³"
+                icon={Activity}
+                accentColor="#00D4AA"
+                tooltip="How many protons per cubic centimeter are packed into the solar wind. Typical is 3–10 p/cm³. High density amplifies storm intensity — a dense, fast wind hitting a southward Bz is the worst-case combination for geomagnetic storms."
+              />
+              <MetricCard
+                title="Bz Component"
+                value={data.currentSolarWind?.bz != null ? data.currentSolarWind.bz.toFixed(1) : '—'}
+                unit="nT"
+                icon={ThermometerSun}
+                accentColor="#ef4444"
+                tooltip="The north-south tilt of the Sun's magnetic field as it reaches Earth. When Bz goes negative (southward), it links with Earth's magnetic field and lets solar energy pour through — the primary trigger for geomagnetic storms. Even moderate solar wind can cause a strong storm if Bz is deeply negative."
+              />
+              <MetricCard
+                title="X-Ray Flux Class"
+                value={data.currentXrayClass}
+                unit="GOES"
+                icon={Zap}
+                accentColor="#FF6B35"
+                tooltip="The intensity of the latest solar flare measured by GOES satellites. Classes go B → C → M → X, each 10× stronger than the last. C-class is minor background activity. M-class can cause brief radio blackouts. X-class flares can knock out HF radio globally and energize the Van Allen belts for days."
+              />
             </div>
             <StormStatus
               stormLevel={stormLevel}
