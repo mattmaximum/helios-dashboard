@@ -595,10 +595,9 @@ export async function fetchSolarData(): Promise<SolarData> {
     spaceWeatherAlerts = [];
   }
 
-  // Combine all event types, sort newest-first
-  const allAlertEvents = alertsToEvents(spaceWeatherAlerts, since30d);
+  // Combine observed event types only (no watches/advisories — those go in the forecast section)
   const stormEvents = deriveStormOnsets(kpIndex, since30d);
-  const solarEvents: SolarEvent[] = [...flareEvents, ...stormEvents, ...allAlertEvents]
+  const solarEvents: SolarEvent[] = [...flareEvents, ...stormEvents]
     .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
 
   // Fall back to mock if every source failed

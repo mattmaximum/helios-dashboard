@@ -2,16 +2,18 @@ import { useState } from 'react';
 import { SolarEvent, EventSeverity } from '@/data/solarData';
 import InfoTip from './InfoTip';
 
-type TimeRange = '24h' | '1w' | '1m';
+type TimeRange = '24h' | '72h' | '1w' | '1m';
 
 const RANGE_MS: Record<TimeRange, number> = {
   '24h': 24 * 60 * 60 * 1000,
+  '72h': 72 * 60 * 60 * 1000,
   '1w':  7  * 24 * 60 * 60 * 1000,
   '1m':  30 * 24 * 60 * 60 * 1000,
 };
 
 const RANGE_LABEL: Record<TimeRange, string> = {
   '24h': '24H',
+  '72h': '72H',
   '1w':  '1W',
   '1m':  '1M',
 };
@@ -52,7 +54,7 @@ interface Props {
 }
 
 export default function SolarEventLog({ events }: Props) {
-  const [range, setRange] = useState<TimeRange>('24h');
+  const [range, setRange] = useState<TimeRange>('72h');
 
   const cutoff = Date.now() - RANGE_MS[range];
   const visible = events.filter((e) => new Date(e.time).getTime() >= cutoff);
@@ -68,7 +70,7 @@ export default function SolarEventLog({ events }: Props) {
 
         {/* Time range toggle */}
         <div className="ml-auto flex items-center gap-0.5 rounded-lg border border-gray-800/60 bg-gray-900/60 p-0.5">
-          {(['24h', '1w', '1m'] as TimeRange[]).map((r) => (
+          {(['24h', '72h', '1w', '1m'] as TimeRange[]).map((r) => (
             <button
               key={r}
               onClick={() => setRange(r)}
@@ -90,7 +92,7 @@ export default function SolarEventLog({ events }: Props) {
           <div className="flex items-center gap-2 px-4 py-4">
             <div className="h-1.5 w-1.5 rounded-full bg-emerald-500/70 shrink-0" />
             <p className="text-xs text-gray-600">
-              No significant events in the past {RANGE_LABEL[range].toLowerCase() === '24h' ? '24 hours' : RANGE_LABEL[range].toLowerCase() === '1w' ? 'week' : 'month'}
+              No significant events in the past {{ '24h': '24 hours', '72h': '72 hours', '1w': 'week', '1m': 'month' }[range]}
             </p>
           </div>
         ) : (
