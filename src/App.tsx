@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AlertTriangle, Wind, ThermometerSun, RefreshCw, Zap, Sun, Activity } from 'lucide-react';
 import { fetchSolarData, SolarData } from '@/data/solarData';
-import StormAlert from './components/StormAlert';
+import StormStatus from './components/StormStatus';
 import KpGauge from './components/KpGauge';
 import MetricCard from './components/MetricCard';
 import LiveSun from './components/LiveSun';
@@ -159,15 +159,6 @@ export default function App() {
 
       {/* Main content */}
       <main className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
-        {/* === Storm Alert Hero === */}
-        <div className="mb-6">
-          <StormAlert
-            stormLevel={stormLevel}
-            currentKp={currentKpNum}
-            lastUpdated={lastUpdatedMs}
-          />
-        </div>
-
         {/* === Row: MetricCards === */}
         <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <MetricCard
@@ -204,11 +195,18 @@ export default function App() {
           />
         </div>
 
-        {/* === Row: KpGauge + LiveSun === */}
-        <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <KpGauge
-            currentKp={currentKpNum}
-          />
+        {/* === Row: KpGauge + StormStatus | LiveSun === */}
+        <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-stretch">
+          <div className="flex flex-col gap-4">
+            <div className="flex-1 min-h-0">
+              <KpGauge currentKp={currentKpNum} />
+            </div>
+            <StormStatus
+              stormLevel={stormLevel}
+              currentKp={currentKpNum}
+              lastUpdated={lastUpdatedMs}
+            />
+          </div>
           <LiveSun />
         </div>
 

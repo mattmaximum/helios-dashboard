@@ -52,12 +52,12 @@ export default function KpGauge({ currentKp }: Props) {
   };
 
   return (
-    <div className="rounded-2xl border border-gray-800/40 bg-gray-950/50 p-6 backdrop-blur-sm">
+    <div className="h-full rounded-2xl border border-gray-800/40 bg-gray-950/50 p-6 backdrop-blur-sm flex flex-col">
       <div className="mb-4 flex items-center gap-2">
         <h3 className="text-sm font-semibold uppercase tracking-widest text-gray-400">Kp Index Gauge</h3>
         <InfoTip content="The planetary K-index (Kp) measures global geomagnetic disturbance on a 0–9 scale, updated every 15 minutes. Kp 0–4 is quiet. Kp 5 starts a G1 minor storm. Kp 6+ (G2) is when real-world impacts begin — satellite drag, power grid fluctuations, and auroras visible in the northern US." />
       </div>
-      <div className="relative flex justify-center">
+      <div className="relative flex flex-1 items-center justify-center">
         {/* Outer glow ring — pulses when G2+ */}
         <div className={`absolute inset-0 rounded-full blur-xl opacity-30 pointer-events-none ${glowPulseClass(currentKp)}`} />
         <svg width="300" height="300" viewBox="0 0 300 300" className="relative w-full max-w-[300px]">
