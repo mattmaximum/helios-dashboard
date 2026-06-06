@@ -99,7 +99,7 @@ export default function SolarRating({ currentKp, windSpeed, xrayClass, f107 }: P
   ];
 
   return (
-    <div className={`relative overflow-hidden rounded-xl border ${cfg.border} ${cfg.bg} backdrop-blur-sm mb-4`}>
+    <div className={`relative overflow-hidden rounded-xl border ${cfg.border} ${cfg.bg} backdrop-blur-sm`}>
       <div className={`h-px w-full bg-gradient-to-r ${cfg.bar}`} />
       <div className="flex flex-wrap items-center gap-x-5 gap-y-3 px-5 py-3.5">
 

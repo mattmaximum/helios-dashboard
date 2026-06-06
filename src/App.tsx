@@ -160,17 +160,15 @@ export default function App() {
 
       {/* Main content */}
       <main className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
-        {/* === Solar Activity Rating banner === */}
-        <SolarRating
-          currentKp={currentKpNum}
-          windSpeed={data.currentSolarWind?.speed ?? null}
-          xrayClass={data.currentXrayClass}
-          f107={data.f107}
-        />
-
-        {/* === Row: [KpGauge + MetricCards + StormStatus] | LiveSun === */}
-        <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-stretch">
+        {/* === Row: [SolarRating + KpGauge + MetricCards + StormStatus] | LiveSun === */}
+        <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
           <div className="flex flex-col gap-3">
+            <SolarRating
+              currentKp={currentKpNum}
+              windSpeed={data.currentSolarWind?.speed ?? null}
+              xrayClass={data.currentXrayClass}
+              f107={data.f107}
+            />
             <KpGauge currentKp={currentKpNum} />
             <div className="grid grid-cols-2 gap-3">
               <MetricCard
