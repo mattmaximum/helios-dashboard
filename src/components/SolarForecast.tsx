@@ -48,6 +48,10 @@ export default function SolarForecast({ kpForecast, spaceWeatherAlerts }: Props)
 
   if (strips.length === 0) return null;
 
+  const activeAlerts = spaceWeatherAlerts.filter(
+    (a) => now - new Date(a.issueTime).getTime() <= 72 * 60 * 60 * 1000
+  );
+
   const startMs = new Date(strips[0].time).getTime();
   const endMs   = new Date(strips[strips.length - 1].time).getTime() + 3 * 60 * 60 * 1000;
   const span    = endMs - startMs;
@@ -144,14 +148,14 @@ export default function SolarForecast({ kpForecast, spaceWeatherAlerts }: Props)
           <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">Space Weather Watches</p>
           <InfoTip content="Active geomagnetic storm watches and CME arrival advisories issued by NOAA SWPC. A 'watch' means conditions are favorable for a storm; a 'warning' means onset is imminent. CME advisories include estimated arrival time when available." />
         </div>
-        {spaceWeatherAlerts.length === 0 ? (
+        {activeAlerts.length === 0 ? (
           <div className="flex items-center gap-2">
             <div className="h-1.5 w-1.5 rounded-full bg-emerald-500/80 shrink-0" />
             <p className="text-xs text-gray-600">No active watches or advisories</p>
           </div>
         ) : (
           <div className="flex flex-col gap-2.5">
-            {spaceWeatherAlerts.slice().reverse().slice(0, 3).map((alert, i) => {
+            {activeAlerts.slice().reverse().slice(0, 3).map((alert, i) => {
               const color = alertColor(alert.gScale);
               const timeStr = alert.issueTime
                 ? (() => {
