@@ -111,7 +111,7 @@ const URLS = {
   plasma: 'https://services.swpc.noaa.gov/products/solar-wind/plasma-7-day.json',
   mag: 'https://services.swpc.noaa.gov/products/solar-wind/mag-7-day.json',
   xray: 'https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json',
-  xrayFlares: 'https://services.swpc.noaa.gov/products/flares/observed-flares.json',
+  xrayFlares: 'https://services.swpc.noaa.gov/json/goes/primary/xray-flares-7-day.json',
   f107: 'https://services.swpc.noaa.gov/products/solar-cycle/observed-solar-cycle-indices.json',
   kpForecast: 'https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json',
   alerts: 'https://services.swpc.noaa.gov/products/alerts.json',
@@ -310,19 +310,15 @@ function flareSeverity(classStr: string): EventSeverity {
   return 'minor';
 }
 
-function parseFlares(rows: Record<string, string>[], since: number): SolarEvent[] {
+// Actual fields from /json/goes/primary/xray-flares-7-day.json:
+// begin_time, begin_class, max_time, max_class, end_time, end_class, satellite
+function parseFlares(rows: Record<string, unknown>[], since: number): SolarEvent[] {
   return rows
-    .map((row) => {
-      // Field names vary across NOAA product versions — check several
-      const classStr = (
-        row.goes_class ?? row.going_class ?? row.noaa_class ?? row.max_class ?? row.classType ?? ''
-      ).trim();
-      const timeStr = (
-        row.peak_time ?? row.max_time ?? row.begin_time ?? row.time_tag ?? ''
-      ).trim();
-      const location = (row.location ?? row.loc_frq ?? '').trim();
-      const region = (row.region ?? row.active_region ?? row['reg#'] ?? '').trim();
-      return { classStr, timeStr, location, region };
+    .map((row, i) => {
+      const classStr = String(row.max_class ?? row.begin_class ?? '').trim();
+      const timeStr  = String(row.max_time  ?? row.begin_time  ?? '').trim();
+      const satellite = row.satellite ? `GOES-${row.satellite}` : '';
+      return { classStr, timeStr, satellite, i };
     })
     .filter(({ classStr, timeStr }) => {
       if (!classStr || !timeStr) return false;
@@ -331,21 +327,15 @@ function parseFlares(rows: Record<string, string>[], since: number): SolarEvent[
       const t = new Date(timeStr).getTime();
       return !isNaN(t) && t >= since;
     })
-    .map(({ classStr, timeStr, location, region }, i) => {
-      const detail = [
-        region ? `Region ${region}` : '',
-        location || '',
-      ].filter(Boolean).join(' · ') || 'GOES satellite detection';
-      return {
-        id: `flare-${timeStr}-${i}`,
-        time: new Date(timeStr).toISOString(),
-        type: 'flare' as const,
-        title: `${classStr} Solar Flare`,
-        detail,
-        severity: flareSeverity(classStr),
-        badge: classStr,
-      };
-    });
+    .map(({ classStr, timeStr, satellite, i }) => ({
+      id: `flare-${timeStr}-${i}`,
+      time: new Date(timeStr).toISOString(),
+      type: 'flare' as const,
+      title: `${classStr} Solar Flare`,
+      detail: satellite || 'GOES satellite detection',
+      severity: flareSeverity(classStr),
+      badge: classStr,
+    }));
 }
 
 function deriveStormOnsets(kpReadings: KpReading[], since: number): SolarEvent[] {
@@ -446,7 +436,7 @@ export async function fetchSolarData(): Promise<SolarData> {
     fetchJSON<Record<string, unknown>[]>(URLS.f107),
     fetchProductCSV<Record<string, string>>(URLS.kpForecast),
     fetchJSON<Record<string, unknown>[]>(URLS.alerts),
-    fetchProductCSV<Record<string, string>>(URLS.xrayFlares),
+    fetchJSON<Record<string, unknown>[]>(URLS.xrayFlares),
   ]);
 
   // Kp index
@@ -561,11 +551,13 @@ export async function fetchSolarData(): Promise<SolarData> {
   // Solar event log — unified feed of M1.0+ flares, G1+ storm onsets, CME watches
   // Use 30-day window so the 1W/1M toggles in the UI have data to show
   const since30d = lastUpdated - 30 * 24 * 60 * 60 * 1000;
+  // NOAA xray-flares-7-day.json covers at most 7 days — use that as ceiling
+  const since7d = lastUpdated - 7 * 24 * 60 * 60 * 1000;
   let flareEvents: SolarEvent[] = [];
   if (flaresResult.status === 'fulfilled') {
-    flareEvents = parseFlares(flaresResult.value, since30d);
+    flareEvents = parseFlares(flaresResult.value, since7d);
   } else {
-    console.warn('[Helios] Observed-flares API failed:', flaresResult.reason instanceof Error ? flaresResult.reason.message : flaresResult.reason);
+    console.warn('[Helios] xray-flares API failed:', flaresResult.reason instanceof Error ? flaresResult.reason.message : flaresResult.reason);
   }
 
   // Kp 3-day forecast (header+rows CSV-style product endpoint)
