@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import InfoTip from './InfoTip';
 import type { XrayFluxPoint, SolarWindData } from '@/data/solarData';
 import {
   AreaChart,
@@ -167,9 +168,10 @@ export default function SolarCharts({ kpIndex, xrayFlux, solarWind }: Props) {
 
       {/* KP Index Chart */}
       <div className="chart-animate-in rounded-2xl border border-gray-800/40 bg-gray-950/50 p-6 backdrop-blur-sm" style={{ animationDelay: '0ms' }}>
-        <h3 className="mb-1 text-sm font-semibold uppercase tracking-widest text-gray-400">
-          Kp-index ({rangeLabel})
-        </h3>
+        <div className="mb-1 flex items-center gap-2">
+          <h3 className="text-sm font-semibold uppercase tracking-widest text-gray-400">Kp-index ({rangeLabel})</h3>
+          <InfoTip content="Historical Kp readings over the selected window. The orange reference lines mark G2 (Kp 5) and G3 (Kp 7) thresholds. A sustained run above Kp 5 is a geomagnetic storm in progress." />
+        </div>
         <p className="mb-4 text-xs text-gray-600">Geomagnetic activity over the last {rangeLabel.toLowerCase()}</p>
         <ResponsiveContainer width="100%" height={220}>
           <AreaChart data={kpData}>
@@ -193,9 +195,10 @@ export default function SolarCharts({ kpIndex, xrayFlux, solarWind }: Props) {
 
       {/* X-ray Flux Chart */}
       <div className="chart-animate-in rounded-2xl border border-gray-800/40 bg-gray-950/50 p-6 backdrop-blur-sm" style={{ animationDelay: '120ms' }}>
-        <h3 className="mb-1 text-sm font-semibold uppercase tracking-widest text-gray-400">
-          X-ray Flux ({rangeLabel})
-        </h3>
+        <div className="mb-1 flex items-center gap-2">
+          <h3 className="text-sm font-semibold uppercase tracking-widest text-gray-400">X-ray Flux ({rangeLabel})</h3>
+          <InfoTip content="Solar X-ray output measured by GOES satellites. The scale is logarithmic — each letter class is 10× stronger than the previous. B is background noise, C is minor, M can cause regional radio blackouts, X can cause global HF radio outages. The spike shape indicates a flare event." />
+        </div>
         <p className="mb-4 text-xs text-gray-600">X-class &gt; M-class &gt; C-class &gt; B-class</p>
         <ResponsiveContainer width="100%" height={220}>
           <AreaChart data={xrayData}>
@@ -219,9 +222,10 @@ export default function SolarCharts({ kpIndex, xrayFlux, solarWind }: Props) {
 
       {/* Solar Wind Speed + Density */}
       <div className="chart-animate-in rounded-2xl border border-gray-800/40 bg-gray-950/50 p-6 backdrop-blur-sm" style={{ animationDelay: '240ms' }}>
-        <h3 className="mb-1 text-sm font-semibold uppercase tracking-widest text-gray-400">
-          Solar Wind Speed &amp; Density ({rangeLabel})
-        </h3>
+        <div className="mb-1 flex items-center gap-2">
+          <h3 className="text-sm font-semibold uppercase tracking-widest text-gray-400">Solar Wind Speed &amp; Density ({rangeLabel})</h3>
+          <InfoTip content="Speed (green, left axis) shows how fast the solar wind is moving. Density (teal dashed, right axis) shows how packed it is. A fast AND dense wind is the most geoeffective combination. Values averaged into 15-minute windows to remove sensor noise." />
+        </div>
         <p className="mb-4 text-xs text-gray-600">Speed (km/s, solid) and Density (p/cm³, dashed) — 15-min averages</p>
         <ResponsiveContainer width="100%" height={200}>
           <AreaChart data={windData}>
@@ -238,9 +242,10 @@ export default function SolarCharts({ kpIndex, xrayFlux, solarWind }: Props) {
 
       {/* Bz Component */}
       <div className="chart-animate-in rounded-2xl border border-gray-800/40 bg-gray-950/50 p-6 backdrop-blur-sm" style={{ animationDelay: '360ms' }}>
-        <h3 className="mb-1 text-sm font-semibold uppercase tracking-widest text-gray-400">
-          Interplanetary Magnetic Field ({rangeLabel})
-        </h3>
+        <div className="mb-1 flex items-center gap-2">
+          <h3 className="text-sm font-semibold uppercase tracking-widest text-gray-400">Interplanetary Magnetic Field ({rangeLabel})</h3>
+          <InfoTip content="Bz (red) is the most important line — when it goes negative (below zero), Earth's magnetic shield opens up to solar energy. Bx and By show the field's east-west and dawn-dusk tilt. Averaged into 15-minute windows." />
+        </div>
         <p className="mb-4 text-xs text-gray-600">Southward Bz drives geomagnetic storms — 15-min averages</p>
         <ResponsiveContainer width="100%" height={200}>
           <AreaChart data={bzData}>

@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
+import InfoTip from './InfoTip';
 
 interface Props {
   title: string;
@@ -8,9 +9,10 @@ interface Props {
   accentColor?: string;
   trend?: 'up' | 'down' | 'neutral';
   description?: string;
+  tooltip?: string;
 }
 
-export default function MetricCard({ title, value, unit, icon: Icon, accentColor = '#00FF94', trend, description }: Props) {
+export default function MetricCard({ title, value, unit, icon: Icon, accentColor = '#00FF94', trend, description, tooltip }: Props) {
   const accent = accentColor;
   const trendColor = trend === 'up' ? 'text-emerald-400' : trend === 'down' ? 'text-red-400' : 'text-gray-500';
 
@@ -32,7 +34,10 @@ export default function MetricCard({ title, value, unit, icon: Icon, accentColor
 
       {/* Header */}
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-widest text-gray-500">{title}</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-semibold uppercase tracking-widest text-gray-500">{title}</span>
+          {tooltip && <InfoTip content={tooltip} />}
+        </div>
         <div
           className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-800/40 bg-gray-900/60"
         >

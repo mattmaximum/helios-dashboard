@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { AlertTriangle, Camera, Shield, Wind, Zap } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import type { StormLevel } from '@/data/solarData';
+import InfoTip from './InfoTip';
 
 interface Props {
   stormLevel: StormLevel | null;
@@ -194,9 +195,12 @@ export default function StormAlert({ stormLevel, currentKp, lastUpdated }: Props
 
           {/* Center: description */}
           <div className="max-w-md text-center md:text-left">
-            <p className="text-sm font-medium uppercase tracking-widest text-gray-500">
-              Geomagnetic Storm Status
-            </p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm font-medium uppercase tracking-widest text-gray-500">
+                Geomagnetic Storm Status
+              </p>
+              <InfoTip content="NOAA's G-scale rates geomagnetic storm severity from G1 (minor) to G5 (extreme). G2+ causes measurable satellite drag and power grid fluctuations. G3+ means auroras can be seen as far south as Oregon and Illinois. G5 events can damage transformers and knock out GPS globally." />
+            </div>
             <p className="mt-1 text-base text-gray-300 md:text-lg">
               {stormLevel?.description || 'Active geomagnetic monitoring'}
             </p>
