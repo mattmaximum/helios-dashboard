@@ -42,6 +42,20 @@ export interface XrayFluxPoint {
   class: string;
 }
 
+export interface KpForecastPoint {
+  time: string;
+  kp: number;
+  observed: string; // 'observed' | 'estimated' | 'predicted'
+  noaaScale: string; // 'None' | 'G1' .. 'G5'
+}
+
+export interface SpaceWeatherAlert {
+  issueTime: string;
+  message: string;
+  gScale: string | null; // parsed G-scale if present
+  summary: string;       // first substantive line
+}
+
 export interface SolarData {
   kpIndex: KpReading[];
   currentKp: number | null;
@@ -53,6 +67,8 @@ export interface SolarData {
   xrayFlares: XrayFlareReading[];
   currentXrayClass: string;
   f107: number | null;
+  kpForecast: KpForecastPoint[];
+  spaceWeatherAlerts: SpaceWeatherAlert[];
   lastUpdated: number;
 }
 
@@ -84,6 +100,8 @@ const URLS = {
   xray: 'https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json',
   xrayFlares: 'https://services.swpc.noaa.gov/products/flares/observed-flares.json',
   f107: 'https://services.swpc.noaa.gov/products/solar-cycle/observed-solar-cycle-indices.json',
+  kpForecast: 'https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json',
+  alerts: 'https://services.swpc.noaa.gov/products/alerts.json',
 } as const;
 
 const WAVELENGTHS = {
@@ -204,6 +222,68 @@ function getMockXrayFlux(): { data: XrayFluxPoint[]; flares: XrayFlareReading[] 
   return { data: flux, flares };
 }
 
+function getMockKpForecast(): KpForecastPoint[] {
+  const now = new Date();
+  const base = new Date(Math.ceil(now.getTime() / (3 * 3_600_000)) * 3 * 3_600_000);
+  return Array.from({ length: 26 }, (_, i) => {
+    const offset = i - 2; // -6hr context + 72hr ahead
+    const t = new Date(base.getTime() + offset * 3 * 3_600_000);
+    const kp = Math.max(0.3, Math.min(6, 2.5 + Math.sin(offset * 0.4) * 1.5 + (offset > 10 && offset < 14 ? 2 : 0)));
+    const rounded = Math.round(kp * 3) / 3;
+    const scale = rounded >= 6 ? 'G2' : rounded >= 5 ? 'G1' : 'None';
+    return {
+      time: t.toISOString(),
+      kp: rounded,
+      observed: offset < 0 ? 'observed' : 'predicted',
+      noaaScale: scale,
+    };
+  });
+}
+
+function extractAlertSummary(message: string): { gScale: string | null; summary: string } {
+  const gMatch = message.match(/\b(G[1-5])\b/);
+  const gScale = gMatch ? gMatch[1] : null;
+  const lines = message.split('\n').map(l => l.trim()).filter(Boolean);
+  let summary = '';
+  for (const line of lines) {
+    if (
+      line.length > 30 &&
+      !line.startsWith('Space Weather Message') &&
+      !line.startsWith('Serial Number') &&
+      !line.startsWith('Issue Time') &&
+      !line.startsWith('#') &&
+      !/^\d{4} [A-Z]/.test(line)
+    ) {
+      summary = line.slice(0, 150);
+      break;
+    }
+  }
+  return { gScale, summary: summary || 'Space weather advisory issued.' };
+}
+
+function parseAlerts(raw: Record<string, unknown>[]): SpaceWeatherAlert[] {
+  return raw
+    .filter((item) => {
+      const msg = String(item.message ?? '').toUpperCase();
+      return (
+        msg.includes('CME') ||
+        msg.includes('CORONAL MASS') ||
+        (msg.includes('GEOMAGNETIC') && (msg.includes('WATCH') || msg.includes('WARNING') || msg.includes('ALERT')))
+      );
+    })
+    .map((item) => {
+      const message = String(item.message ?? '');
+      const { gScale, summary } = extractAlertSummary(message);
+      return {
+        issueTime: String(item.issue_datetime ?? item.product_id ?? ''),
+        message,
+        gScale,
+        summary,
+      };
+    })
+    .slice(-5); // keep only the 5 most recent
+}
+
 /** Classify X-ray flux value into GOES class string */
 function classifyFlux(flux: number): string {
   if (flux >= 1e-4) return `X${(flux / 1e-4).toFixed(1)}`;
@@ -217,12 +297,14 @@ export async function fetchSolarData(): Promise<SolarData> {
   const lastUpdated = Date.now();
 
   // Fetch all APIs in parallel
-  const [kpResult, plasmaResult, magResult, xrayResult, f107Result] = await Promise.allSettled([
+  const [kpResult, plasmaResult, magResult, xrayResult, f107Result, kpForecastResult, alertsResult] = await Promise.allSettled([
     fetchJSON<Record<string, unknown>[]>(URLS.kpIndex),
     fetchProductCSV<Record<string, string>>(URLS.plasma),
     fetchProductCSV<Record<string, string>>(URLS.mag),
     fetchJSON<Record<string, unknown>[]>(URLS.xray),
     fetchJSON<Record<string, unknown>[]>(URLS.f107),
+    fetchProductCSV<Record<string, string>>(URLS.kpForecast),
+    fetchJSON<Record<string, unknown>[]>(URLS.alerts),
   ]);
 
   // Kp index
@@ -334,6 +416,33 @@ export async function fetchSolarData(): Promise<SolarData> {
     console.warn('[Helios] F10.7 API failed, using null');
   }
 
+  // Kp 3-day forecast (header+rows CSV-style product endpoint)
+  let kpForecast: KpForecastPoint[];
+  if (kpForecastResult.status === 'fulfilled') {
+    kpForecast = kpForecastResult.value.map((row) => {
+      const kpRaw = parseFloat(row.kp ?? row.Kp ?? '0');
+      const scale = row.noaa_scale ?? row.noaaScale ?? 'None';
+      return {
+        time: row.time_tag ?? '',
+        kp: isNaN(kpRaw) ? 0 : kpRaw,
+        observed: row.observed ?? 'predicted',
+        noaaScale: scale === '-' ? 'None' : scale,
+      };
+    }).filter((p) => p.time !== '');
+  } else {
+    console.warn('[Helios] Kp forecast API failed, using mock data');
+    kpForecast = getMockKpForecast();
+  }
+
+  // Space weather alerts (CME watches/warnings)
+  let spaceWeatherAlerts: SpaceWeatherAlert[];
+  if (alertsResult.status === 'fulfilled') {
+    spaceWeatherAlerts = parseAlerts(alertsResult.value);
+  } else {
+    console.warn('[Helios] Alerts API failed, using empty list');
+    spaceWeatherAlerts = [];
+  }
+
   return {
     kpIndex,
     currentKp,
@@ -345,6 +454,8 @@ export async function fetchSolarData(): Promise<SolarData> {
     xrayFlares,
     currentXrayClass,
     f107,
+    kpForecast,
+    spaceWeatherAlerts,
     lastUpdated,
   };
 }

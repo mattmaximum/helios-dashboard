@@ -8,6 +8,7 @@ import LiveSun from './components/LiveSun';
 import SolarCharts from './components/SolarCharts';
 import SchumannResonance from './components/SchumannResonance';
 import SolarRating from './components/SolarRating';
+import SolarForecast from './components/SolarForecast';
 
 const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
@@ -168,6 +169,10 @@ export default function App() {
               windSpeed={data.currentSolarWind?.speed ?? null}
               xrayClass={data.currentXrayClass}
               f107={data.f107}
+            />
+            <SolarForecast
+              kpForecast={data.kpForecast}
+              spaceWeatherAlerts={data.spaceWeatherAlerts}
             />
             <KpGauge currentKp={currentKpNum} />
             <div className="grid grid-cols-2 gap-3">
