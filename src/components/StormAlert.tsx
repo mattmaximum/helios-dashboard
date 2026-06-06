@@ -124,7 +124,7 @@ export default function StormAlert({ stormLevel, currentKp, lastUpdated }: Props
         {captureError ? 'Capture failed' : capturing ? 'Saving…' : 'Share'}
       </button>
 
-      <div className="relative px-6 py-8 md:px-12 md:py-12 lg:px-16 lg:py-14">
+      <div className="relative px-5 py-5 md:px-8 md:py-6 lg:px-10 lg:py-7">
         {/* Grid overlay pattern */}
         <svg className="absolute inset-0 h-full w-full opacity-[0.03]" xmlns="http://www.w3.org/2000/svg">
           <defs>
@@ -138,7 +138,7 @@ export default function StormAlert({ stormLevel, currentKp, lastUpdated }: Props
         <div className="relative flex flex-col items-center gap-4 md:flex-row md:items-center md:justify-between md:gap-8">
           {/* Left: icon + Kp reading */}
           <div className="flex items-center gap-4 sm:gap-6">
-            <div className="relative flex h-24 w-24 items-center justify-center sm:h-28 sm:w-28 md:h-32 md:w-32">
+            <div className="relative flex h-16 w-16 items-center justify-center sm:h-20 sm:w-20">
               {/* Outer glow ring */}
               <div
                 className={`absolute inset-0 rounded-full blur-sm ${
@@ -146,39 +146,31 @@ export default function StormAlert({ stormLevel, currentKp, lastUpdated }: Props
                 }`}
               />
               <div
-                className={`relative flex h-24 w-24 items-center justify-center rounded-full border-2 sm:h-28 sm:w-28 md:h-32 md:w-32 ${
+                className={`relative flex h-16 w-16 items-center justify-center rounded-full border-2 sm:h-20 sm:w-20 ${
                   code <= 'G1' ? 'border-emerald-500/40 bg-emerald-950/20' : code <= 'G2' ? 'border-yellow-400/30 bg-yellow-950/10' : code <= 'G3' ? 'border-orange-400/30 bg-orange-900/10' : 'border-red-500/40 bg-red-900/20'
                 }`}
               >
-                {code === 'G0' && (
-                  <Shield className={`h-10 w-10 sm:h-12 sm:w-12 ${cfg.textClass}`} />
-                )}
-                {(code === 'G1' || code === 'G2') && (
-                  <Wind className={`h-10 w-10 sm:h-12 sm:w-12 ${cfg.textClass}`} />
-                )}
-                {code === 'G3' && (
-                  <Zap className={`h-10 w-10 sm:h-12 sm:w-12 ${cfg.textClass}`} />
-                )}
-                {(code === 'G4' || code === 'G5') && (
-                  <AlertTriangle className={`h-10 w-10 sm:h-12 sm:w-12 ${cfg.textClass} ${isSevere ? 'animate-pulse' : ''}`} />
-                )}
+                {code === 'G0' && <Shield className={`h-7 w-7 sm:h-8 sm:w-8 ${cfg.textClass}`} />}
+                {(code === 'G1' || code === 'G2') && <Wind className={`h-7 w-7 sm:h-8 sm:w-8 ${cfg.textClass}`} />}
+                {code === 'G3' && <Zap className={`h-7 w-7 sm:h-8 sm:w-8 ${cfg.textClass}`} />}
+                {(code === 'G4' || code === 'G5') && <AlertTriangle className={`h-7 w-7 sm:h-8 sm:w-8 ${cfg.textClass} ${isSevere ? 'animate-pulse' : ''}`} />}
               </div>
             </div>
 
             <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <span className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl tabular-nums text-white">
+              <div className="flex items-center gap-1.5">
+                <span className="text-3xl font-bold tracking-tight sm:text-4xl tabular-nums text-white">
                   {currentKp ?? '—'}
                 </span>
-                <span className={`text-2xl font-semibold sm:text-3xl ${cfg.textClass}`}>
+                <span className={`text-lg font-semibold sm:text-xl ${cfg.textClass}`}>
                   / 9
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <span className={`text-base font-bold sm:text-lg md:text-xl ${cfg.textClass}`}>
+                <span className={`text-sm font-bold sm:text-base ${cfg.textClass}`}>
                   {stormLevel?.label || 'Quiet'}
                 </span>
-                <span className={`rounded-lg border px-2 py-0.5 text-sm font-bold sm:text-base ${
+                <span className={`rounded-md border px-1.5 py-0.5 text-xs font-bold ${
                   code <= 'G1'
                     ? 'border-emerald-500/30 bg-emerald-950/40 text-emerald-400'
                     : code <= 'G2'

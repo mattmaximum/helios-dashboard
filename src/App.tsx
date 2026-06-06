@@ -158,7 +158,7 @@ export default function App() {
       </header>
 
       {/* Main content */}
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
+      <main className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
         {/* === Storm Alert Hero === */}
         <div className="mb-6">
           <StormAlert
@@ -169,7 +169,7 @@ export default function App() {
         </div>
 
         {/* === Row: MetricCards === */}
-        <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4">
+        <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <MetricCard
             title="Solar Wind Speed"
             value={data.currentSolarWind?.speed != null ? data.currentSolarWind.speed.toString() : '—'}

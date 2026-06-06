@@ -18,7 +18,7 @@ export default function MetricCard({ title, value, unit, icon: Icon, accentColor
 
   return (
     <div
-      className="group relative overflow-hidden rounded-2xl border border-gray-800/40 bg-gray-950/50 p-5 backdrop-blur-sm transition-all duration-300 hover:border-gray-700/60 hover:shadow-lg hover:shadow-black/40"
+      className="group relative overflow-hidden rounded-xl border border-gray-800/40 bg-gray-950/50 p-4 backdrop-blur-sm transition-all duration-300 hover:border-gray-700/60 hover:shadow-lg hover:shadow-black/40"
     >
       {/* Accent top bar */}
       <div
@@ -39,16 +39,16 @@ export default function MetricCard({ title, value, unit, icon: Icon, accentColor
           {tooltip && <InfoTip content={tooltip} />}
         </div>
         <div
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-800/40 bg-gray-900/60"
+          className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-800/40 bg-gray-900/60"
         >
-          <Icon className="h-4 w-4" style={{ color: accent }} />
+          <Icon className="h-3.5 w-3.5" style={{ color: accent }} />
         </div>
       </div>
 
       {/* Value */}
-      <div className="mt-3 flex items-end gap-2">
-        <span className="text-2xl font-bold text-white tabular-nums">{value}</span>
-        <span className="text-xs font-semibold text-gray-500">{unit}</span>
+      <div className="mt-2 flex items-end gap-1.5">
+        <span className="text-xl font-bold text-white tabular-nums">{value}</span>
+        <span className="text-xs font-semibold text-gray-500 mb-0.5">{unit}</span>
         {trend && (
           <span className={`text-xs ${trendColor}`}>
             {trend === 'up' ? '↑' : trend === 'down' ? '↓' : '→'}
