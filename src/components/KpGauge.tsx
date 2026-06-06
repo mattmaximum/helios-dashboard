@@ -26,7 +26,7 @@ function glowPulseClass(level: number): string {
 export default function KpGauge({ currentKp }: Props) {
   if (currentKp == null) {
     return (
-      <div className="h-full rounded-2xl border border-gray-800/50 bg-gray-950/50 p-6 flex items-center justify-center backdrop-blur-sm">
+      <div className="rounded-2xl border border-gray-800/50 bg-gray-950/50 p-6 flex items-center justify-center backdrop-blur-sm">
         <p className="text-gray-500 text-sm">Awaiting data…</p>
       </div>
     );
@@ -39,7 +39,7 @@ export default function KpGauge({ currentKp }: Props) {
   const arrowPct = (clampedKp / TOTAL_FLEX) * 100;
 
   return (
-    <div className="h-full rounded-2xl border border-gray-800/40 bg-gray-950/50 p-6 backdrop-blur-sm flex flex-col">
+    <div className="rounded-2xl border border-gray-800/40 bg-gray-950/50 p-6 backdrop-blur-sm flex flex-col">
       {/* Header */}
       <div className="flex items-center gap-2 mb-5">
         <h3 className="text-sm font-semibold uppercase tracking-widest text-gray-400">Kp Index</h3>
@@ -63,7 +63,7 @@ export default function KpGauge({ currentKp }: Props) {
       </div>
 
       {/* Bar + arrow — flex-1 so it fills remaining space, content centered */}
-      <div className={`flex-1 flex flex-col justify-center ${glowPulseClass(level)}`}>
+      <div className={`flex flex-col ${glowPulseClass(level)}`}>
         {/* Arrow row */}
         <div className="relative h-4 mb-1">
           <div
