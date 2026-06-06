@@ -54,12 +54,9 @@ export default function KpGauge({ currentKp }: Props) {
         >
           {clampedKp.toFixed(1)}
         </span>
-        <div className="mb-1">
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-600">Kp Index</p>
-          <p className="text-sm font-semibold" style={{ color: stormLevel.color }}>
-            {stormLevel.label}
-          </p>
-        </div>
+        <p className="mb-1 text-sm font-semibold" style={{ color: stormLevel.color }}>
+          {stormLevel.label}
+        </p>
       </div>
 
       {/* Bar + arrow — flex-1 so it fills remaining space, content centered */}
