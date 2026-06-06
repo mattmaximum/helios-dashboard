@@ -601,7 +601,9 @@ export async function fetchSolarData(): Promise<SolarData> {
     currentKpLabel: kpIndex.length > 0 ? `${currentKp}` : 'N/A',
     currentStormLevel,
     solarWind,
-    currentSolarWind: solarWind.length > 0 ? solarWind[solarWind.length - 1] : null,
+    currentSolarWind: solarWind.length > 0
+      ? (solarWind.slice().reverse().find((d) => d.speed != null && d.density != null) ?? solarWind[solarWind.length - 1])
+      : null,
     xrayFlux,
     xrayFlares,
     currentXrayClass,
