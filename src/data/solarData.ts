@@ -52,6 +52,7 @@ export interface SolarData {
   xrayFlux: XrayFluxPoint[];
   xrayFlares: XrayFlareReading[];
   currentXrayClass: string;
+  f107: number | null;
   lastUpdated: number;
 }
 
@@ -82,6 +83,7 @@ const URLS = {
   mag: 'https://services.swpc.noaa.gov/products/solar-wind/mag-7-day.json',
   xray: 'https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json',
   xrayFlares: 'https://services.swpc.noaa.gov/products/flares/observed-flares.json',
+  f107: 'https://services.swpc.noaa.gov/products/solar-cycle/observed-solar-cycle-indices.json',
 } as const;
 
 const WAVELENGTHS = {
@@ -215,11 +217,12 @@ export async function fetchSolarData(): Promise<SolarData> {
   const lastUpdated = Date.now();
 
   // Fetch all APIs in parallel
-  const [kpResult, plasmaResult, magResult, xrayResult] = await Promise.allSettled([
+  const [kpResult, plasmaResult, magResult, xrayResult, f107Result] = await Promise.allSettled([
     fetchJSON<Record<string, unknown>[]>(URLS.kpIndex),
     fetchProductCSV<Record<string, string>>(URLS.plasma),
     fetchProductCSV<Record<string, string>>(URLS.mag),
     fetchJSON<Record<string, unknown>[]>(URLS.xray),
+    fetchJSON<Record<string, unknown>[]>(URLS.f107),
   ]);
 
   // Kp index
@@ -321,6 +324,16 @@ export async function fetchSolarData(): Promise<SolarData> {
   const lastXray = xrayFlux.length > 0 ? xrayFlux[xrayFlux.length - 1] : null;
   const currentXrayClass = lastXray?.class || 'B0.0';
 
+  // F10.7cm radio flux — monthly solar cycle index, last entry is most recent
+  let f107: number | null = null;
+  if (f107Result.status === 'fulfilled' && Array.isArray(f107Result.value) && f107Result.value.length > 0) {
+    const last = f107Result.value[f107Result.value.length - 1] as Record<string, unknown>;
+    const raw = last['f10.7'] ?? last['f107'] ?? last['flux'];
+    f107 = typeof raw === 'number' ? raw : raw != null ? parseFloat(String(raw)) : null;
+  } else {
+    console.warn('[Helios] F10.7 API failed, using null');
+  }
+
   return {
     kpIndex,
     currentKp,
@@ -331,6 +344,7 @@ export async function fetchSolarData(): Promise<SolarData> {
     xrayFlux,
     xrayFlares,
     currentXrayClass,
+    f107,
     lastUpdated,
   };
 }

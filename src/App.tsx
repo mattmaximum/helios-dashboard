@@ -7,6 +7,7 @@ import MetricCard from './components/MetricCard';
 import LiveSun from './components/LiveSun';
 import SolarCharts from './components/SolarCharts';
 import SchumannResonance from './components/SchumannResonance';
+import SolarRating from './components/SolarRating';
 
 const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
@@ -159,6 +160,14 @@ export default function App() {
 
       {/* Main content */}
       <main className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
+        {/* === Solar Activity Rating banner === */}
+        <SolarRating
+          currentKp={currentKpNum}
+          windSpeed={data.currentSolarWind?.speed ?? null}
+          xrayClass={data.currentXrayClass}
+          f107={data.f107}
+        />
+
         {/* === Row: [KpGauge + MetricCards + StormStatus] | LiveSun === */}
         <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-stretch">
           <div className="flex flex-col gap-3">
