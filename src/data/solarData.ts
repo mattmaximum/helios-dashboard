@@ -608,25 +608,37 @@ export async function fetchSolarData(): Promise<SolarData> {
     // Solar cycle chart: last 11 years of observed data
     const cutoffYear = new Date().getFullYear() - 11;
     const cutoffTag = `${cutoffYear}-01`;
-    const observed: SolarCyclePoint[] = cycleObsRows
-      .filter((row) => String(row['time-tag'] ?? '') >= cutoffTag)
-      .map((row) => {
-        const tag = String(row['time-tag'] ?? '');
-        const ts = new Date(`${tag}-01T00:00:00Z`).getTime();
-        const rawSsn = Number(row['observed_swpc_ssn'] ?? row['ssn'] ?? -1);
-        const rawSmoothed = Number(row['smoothed_swpc_ssn'] ?? row['smoothed_ssn'] ?? -1);
-        // Smoothed SSN requires 6 months of future data; fall back to raw observed
-        // so the trend line reaches the present rather than stopping 6 months early.
-        const smoothedVal = rawSmoothed > 0 ? rawSmoothed : (rawSsn >= 0 ? rawSsn : null);
-        return {
-          ts,
-          ssn: rawSsn >= 0 ? rawSsn : null,
-          smoothed: smoothedVal,
-          predicted: null,
-          bandBase: null,
-          bandTop: null,
-        };
-      });
+    // Keep a wider slice for the trailing-average window — include 12 months before cutoff
+    const widerCutoffYear = new Date().getFullYear() - 12;
+    const widerCutoffTag = `${widerCutoffYear}-01`;
+    const rawObserved = cycleObsRows.filter((row) => String(row['time-tag'] ?? '') >= widerCutoffTag);
+
+    const observed: SolarCyclePoint[] = [];
+    for (let i = 0; i < rawObserved.length; i++) {
+      const row = rawObserved[i];
+      const tag = String(row['time-tag'] ?? '');
+      const ts = new Date(`${tag}-01T00:00:00Z`).getTime();
+      const rawSsn = Number(row['observed_swpc_ssn'] ?? row['ssn'] ?? -1);
+      const rawSmoothed = Number(row['smoothed_swpc_ssn'] ?? row['smoothed_ssn'] ?? -1);
+
+      let smoothed: number | null = rawSmoothed > 0 ? rawSmoothed : null;
+      if (smoothed === null && rawSsn >= 0) {
+        // NOAA's 13-month centered average needs 6 future months — not available yet.
+        // Compute a trailing 12-month moving average from raw values as a stand-in.
+        const WINDOW = 12;
+        const vals: number[] = [];
+        for (let j = Math.max(0, i - WINDOW + 1); j <= i; j++) {
+          const v = Number(rawObserved[j]['observed_swpc_ssn'] ?? rawObserved[j]['ssn'] ?? -1);
+          if (v >= 0) vals.push(v);
+        }
+        smoothed = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+      }
+
+      // Only include in the output after the cutoff date
+      if (tag >= cutoffTag) {
+        observed.push({ ts, ssn: rawSsn >= 0 ? rawSsn : null, smoothed, predicted: null, bandBase: null, bandTop: null });
+      }
+    }
 
     // Merge with predicted data beyond the last observed month
     const lastObservedTs = observed.length > 0 ? observed[observed.length - 1].ts : 0;
