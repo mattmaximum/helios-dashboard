@@ -48,8 +48,10 @@ export default function SolarForecast({ kpForecast, spaceWeatherAlerts }: Props)
 
   if (strips.length === 0) return null;
 
+  // Show watches issued within the past 5 days — CME watches are often issued
+  // 2–4 days before predicted arrival, so 72h would hide still-active advisories.
   const activeAlerts = spaceWeatherAlerts.filter(
-    (a) => now - new Date(a.issueTime).getTime() <= 72 * 60 * 60 * 1000
+    (a) => now - new Date(a.issueTime).getTime() <= 5 * 24 * 60 * 60 * 1000
   );
 
   const startMs = new Date(strips[0].time).getTime();

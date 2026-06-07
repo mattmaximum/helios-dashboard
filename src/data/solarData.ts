@@ -281,7 +281,9 @@ function parseAlerts(raw: Record<string, unknown>[]): SpaceWeatherAlert[] {
       return (
         msg.includes('CME') ||
         msg.includes('CORONAL MASS') ||
-        (msg.includes('GEOMAGNETIC') && (msg.includes('WATCH') || msg.includes('WARNING') || msg.includes('ALERT')))
+        msg.includes('SOLAR ENERGETIC') ||
+        (msg.includes('GEOMAGNETIC') && (msg.includes('WATCH') || msg.includes('WARNING') || msg.includes('ALERT'))) ||
+        (msg.includes('STORM') && (msg.includes('WATCH') || msg.includes('WARNING')))
       );
     })
     .map((item) => {
@@ -294,7 +296,7 @@ function parseAlerts(raw: Record<string, unknown>[]): SpaceWeatherAlert[] {
         summary,
       };
     })
-    .slice(-5); // keep only the 5 most recent
+    .slice(-8); // keep up to 8 most recent (CME watches often cluster)
 }
 
 function flareSeverity(classStr: string): EventSeverity {
