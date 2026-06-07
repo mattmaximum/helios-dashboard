@@ -615,10 +615,13 @@ export async function fetchSolarData(): Promise<SolarData> {
         const ts = new Date(`${tag}-01T00:00:00Z`).getTime();
         const rawSsn = Number(row['observed_swpc_ssn'] ?? row['ssn'] ?? -1);
         const rawSmoothed = Number(row['smoothed_swpc_ssn'] ?? row['smoothed_ssn'] ?? -1);
+        // Smoothed SSN requires 6 months of future data; fall back to raw observed
+        // so the trend line reaches the present rather than stopping 6 months early.
+        const smoothedVal = rawSmoothed > 0 ? rawSmoothed : (rawSsn >= 0 ? rawSsn : null);
         return {
           ts,
           ssn: rawSsn >= 0 ? rawSsn : null,
-          smoothed: rawSmoothed > 0 ? rawSmoothed : null,
+          smoothed: smoothedVal,
           predicted: null,
           bandBase: null,
           bandTop: null,
