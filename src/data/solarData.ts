@@ -115,6 +115,7 @@ const URLS = {
   f107: 'https://services.swpc.noaa.gov/products/solar-cycle/observed-solar-cycle-indices.json',
   kpForecast: 'https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json',
   alerts: 'https://services.swpc.noaa.gov/products/alerts.json',
+  forecast3day: 'https://services.swpc.noaa.gov/text/3-day-forecast.txt',
 } as const;
 
 const WAVELENGTHS = {
@@ -299,6 +300,42 @@ function parseAlerts(raw: Record<string, unknown>[]): SpaceWeatherAlert[] {
     .slice(-8); // keep up to 8 most recent (CME watches often cluster)
 }
 
+// NOAA time format: "2026 Jun 07 0030 UTC" → ISO string
+function parseNoaaTimeStr(s: string): string {
+  const MONTHS: Record<string, string> = {
+    Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06',
+    Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12',
+  };
+  const m = s.match(/(\d{4})\s+(\w{3})\s+(\d{2})\s+(\d{2})(\d{2})\s+UTC/);
+  if (!m) return s;
+  const [, year, mon, day, hh, mm] = m;
+  return `${year}-${MONTHS[mon] ?? '01'}-${day}T${hh}:${mm}:00Z`;
+}
+
+// Parse NOAA 3-day-forecast.txt for an active geomagnetic advisory
+function parse3DayForecast(text: string): SpaceWeatherAlert[] {
+  const issuedMatch = text.match(/:Issued:\s*(\d{4} \w+ \d{2} \d{4} UTC)/);
+  const issueTime = issuedMatch ? parseNoaaTimeStr(issuedMatch[1]) : new Date().toISOString();
+
+  // Only create an advisory if G1+ activity is forecast
+  const gMatch = text.match(/greatest expected 3 hr Kp[^(]*\(NOAA Scale (G[1-5])\)/i);
+  if (!gMatch) return [];
+  const gScale = gMatch[1];
+
+  // Pull the geomagnetic rationale paragraph (section A)
+  const ratMatch = text.match(/Rationale:\s*([^\n].+?)(?=\n\s*\n|\nB\.)/s);
+  const rationale = ratMatch
+    ? ratMatch[1].replace(/\s+/g, ' ').trim().slice(0, 250)
+    : `${gScale} geomagnetic activity forecast — see NOAA 3-day forecast.`;
+
+  return [{
+    issueTime,
+    message: text,
+    gScale,
+    summary: rationale,
+  }];
+}
+
 function flareSeverity(classStr: string): EventSeverity {
   const upper = classStr.toUpperCase();
   if (upper.startsWith('X')) {
@@ -430,7 +467,7 @@ export async function fetchSolarData(): Promise<SolarData> {
   const lastUpdated = Date.now();
 
   // Fetch all APIs in parallel
-  const [kpResult, plasmaResult, magResult, xrayResult, f107Result, kpForecastResult, alertsResult, flaresResult] = await Promise.allSettled([
+  const [kpResult, plasmaResult, magResult, xrayResult, f107Result, kpForecastResult, alertsResult, flaresResult, forecast3dayResult] = await Promise.allSettled([
     fetchJSON<Record<string, unknown>[]>(URLS.kpIndex),
     fetchProductCSV<Record<string, string>>(URLS.plasma),
     fetchProductCSV<Record<string, string>>(URLS.mag),
@@ -439,6 +476,7 @@ export async function fetchSolarData(): Promise<SolarData> {
     fetchProductCSV<Record<string, string>>(URLS.kpForecast),
     fetchJSON<Record<string, unknown>[]>(URLS.alerts),
     fetchJSON<Record<string, unknown>[]>(URLS.xrayFlares),
+    fetch(URLS.forecast3day, { cache: 'no-store' }).then((r) => r.ok ? r.text() : Promise.reject(r.status)),
   ]);
 
   // Kp index
@@ -580,13 +618,21 @@ export async function fetchSolarData(): Promise<SolarData> {
     kpForecast = getMockKpForecast();
   }
 
-  // Space weather alerts (CME watches/warnings)
+  // Space weather alerts (CME watches/warnings) — merge alerts.json + 3-day forecast
   let spaceWeatherAlerts: SpaceWeatherAlert[];
   if (alertsResult.status === 'fulfilled') {
     spaceWeatherAlerts = parseAlerts(alertsResult.value);
   } else {
     console.warn('[Helios] Alerts API failed, using empty list');
     spaceWeatherAlerts = [];
+  }
+  // Supplement with the 3-day forecast advisory (alerts.json is sometimes stale)
+  if (forecast3dayResult.status === 'fulfilled') {
+    const forecastAlerts = parse3DayForecast(forecast3dayResult.value as string);
+    // Prepend so the forecast advisory appears alongside (or above) any archived alerts
+    spaceWeatherAlerts = [...forecastAlerts, ...spaceWeatherAlerts];
+  } else {
+    console.warn('[Helios] 3-day forecast text failed:', forecast3dayResult.reason);
   }
 
   // Combine observed event types only (no watches/advisories — those go in the forecast section)
