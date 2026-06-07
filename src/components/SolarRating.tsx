@@ -113,7 +113,7 @@ export default function SolarRating({ currentKp, windSpeed, xrayClass, f107 }: P
             <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-500 leading-none mb-0.5">
               Current Solar Activity
             </p>
-            <p className={`text-base font-bold leading-none ${cfg.text}`}>{cfg.label}</p>
+            <p className={`text-2xl font-bold leading-none ${cfg.text}`}>{cfg.label}</p>
           </div>
           <InfoTip content="Composite rating weighted across four inputs: Kp Index (40%), Solar Wind Speed (30%), X-Ray Flux (20%), and F10.7 Radio Flux (10%). Normal = no significant space weather. Slightly Irregular = elevated activity worth watching. Highly Irregular = active space weather with potential real-world impacts." />
         </div>

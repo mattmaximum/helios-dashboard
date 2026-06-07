@@ -49,7 +49,7 @@ export default function KpGauge({ currentKp }: Props) {
       {/* Current Kp display */}
       <div className="flex items-baseline gap-2 mb-4">
         <span
-          className="text-3xl font-bold tabular-nums leading-none"
+          className="text-xl font-bold tabular-nums leading-none"
           style={{ color: stormLevel.color }}
         >
           {clampedKp.toFixed(1)}
