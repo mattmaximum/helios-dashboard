@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { SolarEvent, EventSeverity } from '@/data/solarData';
 import InfoTip from './InfoTip';
+import { useTime } from '@/context/TimeContext';
 
 type TimeRange = '24h' | '72h' | '1w';
 
@@ -40,19 +41,16 @@ function relativeTime(iso: string): string {
   return `${days}d ago`;
 }
 
-function absTime(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    month: 'short', day: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
-}
-
 interface Props {
   events: SolarEvent[];
 }
 
 export default function SolarEventLog({ events }: Props) {
   const [range, setRange] = useState<TimeRange>('72h');
+  const { fmt, suffix } = useTime();
+
+  const absTime = (iso: string) =>
+    fmt(iso, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + suffix;
 
   const cutoff = Date.now() - RANGE_MS[range];
   const visible = events.filter((e) => new Date(e.time).getTime() >= cutoff);

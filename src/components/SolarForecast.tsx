@@ -1,4 +1,7 @@
+import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import InfoTip from './InfoTip';
+import { useTime } from '@/context/TimeContext';
 import { KpForecastPoint, SpaceWeatherAlert } from '@/data/solarData';
 
 // Same palette as KpGauge
@@ -29,6 +32,12 @@ function alertColor(gScale: string | null): string {
   return G_COLOR[gScale] ?? '#FBBF24';
 }
 
+interface TipState {
+  point: KpForecastPoint;
+  x: number;
+  y: number;
+}
+
 interface Props {
   kpForecast: KpForecastPoint[];
   spaceWeatherAlerts: SpaceWeatherAlert[];
@@ -36,6 +45,8 @@ interface Props {
 
 export default function SolarForecast({ kpForecast, spaceWeatherAlerts }: Props) {
   const now = Date.now();
+  const { fmt, suffix } = useTime();
+  const [tip, setTip] = useState<TipState | null>(null);
 
   // Window: last 6 hours → next 72 hours
   const windowStart = now - 6 * 60 * 60 * 1000;
@@ -60,7 +71,7 @@ export default function SolarForecast({ kpForecast, spaceWeatherAlerts }: Props)
 
   const nowPct = Math.max(0, Math.min(100, ((now - startMs) / span) * 100));
 
-  // Day boundary markers (each midnight within the window)
+  // Day boundary markers
   const dayMarkers: { pct: number; label: string }[] = [];
   const seen = new Set<string>();
   for (const p of strips) {
@@ -69,7 +80,7 @@ export default function SolarForecast({ kpForecast, spaceWeatherAlerts }: Props)
     if (!seen.has(dayKey)) {
       seen.add(dayKey);
       const pct = ((new Date(p.time).getTime() - startMs) / span) * 100;
-      const label = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+      const label = fmt(p.time, { weekday: 'short', month: 'short', day: 'numeric' });
       dayMarkers.push({ pct, label });
     }
   }
@@ -96,18 +107,17 @@ export default function SolarForecast({ kpForecast, spaceWeatherAlerts }: Props)
         {/* Strip */}
         <div className="relative flex rounded-md overflow-hidden h-7" style={{ gap: '1px' }}>
           {strips.map((point) => {
-            const gScale   = kpToGScale(point.kp);
-            const color    = G_COLOR[gScale];
-            const isPast   = point.observed !== 'predicted';
-            const timeStr  = new Date(point.time).toLocaleString(undefined, {
-              weekday: 'short', hour: '2-digit', minute: '2-digit',
-            });
+            const gScale = kpToGScale(point.kp);
+            const color  = G_COLOR[gScale];
+            const isPast = point.observed !== 'predicted';
             return (
               <div
                 key={point.time}
-                title={`${timeStr} — Kp ${point.kp.toFixed(1)} · ${gScale} ${G_LABEL[gScale]} · ${point.observed}`}
                 className="flex-1 cursor-default"
                 style={{ backgroundColor: color, opacity: isPast ? 0.35 : 0.85 }}
+                onMouseEnter={(e) => setTip({ point, x: e.clientX, y: e.clientY })}
+                onMouseMove={(e)  => setTip((t) => t ? { ...t, x: e.clientX, y: e.clientY } : null)}
+                onMouseLeave={() => setTip(null)}
               />
             );
           })}
@@ -160,12 +170,7 @@ export default function SolarForecast({ kpForecast, spaceWeatherAlerts }: Props)
             {activeAlerts.slice().reverse().slice(0, 3).map((alert, i) => {
               const color = alertColor(alert.gScale);
               const timeStr = alert.issueTime
-                ? (() => {
-                    const d = new Date(alert.issueTime);
-                    return isNaN(d.getTime()) ? alert.issueTime : d.toLocaleString(undefined, {
-                      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-                    });
-                  })()
+                ? fmt(alert.issueTime, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + suffix
                 : '';
               return (
                 <div key={i} className="flex gap-2 items-start">
@@ -193,6 +198,41 @@ export default function SolarForecast({ kpForecast, spaceWeatherAlerts }: Props)
           </div>
         )}
       </div>
+
+      {/* Portal hover tooltip for forecast blocks */}
+      {tip && createPortal(
+        <div
+          className="fixed z-[9999] pointer-events-none rounded-lg border border-gray-700/60 bg-gray-950/95 px-3 py-2 shadow-xl backdrop-blur-sm"
+          style={{ left: tip.x + 14, top: tip.y - 48 }}
+        >
+          {(() => {
+            const gScale = kpToGScale(tip.point.kp);
+            const color  = G_COLOR[gScale];
+            const timeLabel = fmt(tip.point.time, {
+              weekday: 'short', month: 'short', day: 'numeric',
+              hour: '2-digit', minute: '2-digit',
+            }) + suffix;
+            return (
+              <>
+                <p className="text-[11px] font-semibold text-gray-200 whitespace-nowrap">{timeLabel}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs font-bold" style={{ color }}>
+                    Kp {tip.point.kp.toFixed(1)}
+                  </span>
+                  <span
+                    className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                    style={{ backgroundColor: `${color}22`, color, border: `1px solid ${color}44` }}
+                  >
+                    {gScale} {G_LABEL[gScale]}
+                  </span>
+                </div>
+                <p className="text-[10px] text-gray-500 mt-0.5 capitalize">{tip.point.observed}</p>
+              </>
+            );
+          })()}
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

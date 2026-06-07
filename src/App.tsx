@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useTime } from '@/context/TimeContext';
 import { AlertTriangle, Wind, ThermometerSun, RefreshCw, Zap, Sun, Activity } from 'lucide-react';
 import { fetchSolarData, SolarData } from '@/data/solarData';
 import StormStatus from './components/StormStatus';
@@ -50,6 +51,7 @@ function useSolarData() {
 export default function App() {
   const { data, loading, error, refresh } = useSolarData();
   const [refreshing, setRefreshing] = useState(false);
+  const { mode: timeMode, toggle: toggleTime, fmt: fmtTime, suffix: timeSuffix } = useTime();
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -112,12 +114,10 @@ export default function App() {
   const lastUpdatedMs = data.currentSolarWind?.timestamp
     ? new Date(data.currentSolarWind.timestamp).getTime()
     : data.lastUpdated;
-  const lastUpdatedFormatted = data.currentSolarWind
-    ? new Date(data.currentSolarWind.timestamp).toLocaleString(undefined, {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      })
-    : new Date(data.lastUpdated).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  const lastUpdatedFormatted = fmtTime(
+    data.currentSolarWind?.timestamp ?? new Date(data.lastUpdated).toISOString(),
+    { dateStyle: 'medium', timeStyle: 'short' }
+  ) + timeSuffix;
 
   return (
     <div className={`min-h-screen aurora-bg${isAlert ? ' aurora-alert-mode' : ''}`}>
@@ -144,6 +144,20 @@ export default function App() {
             <span className="hidden text-xs text-gray-600 sm:inline">
               {lastUpdatedFormatted}
             </span>
+            {/* UTC / Local time toggle */}
+            <div className="flex items-center gap-0.5 rounded-lg border border-gray-800/60 bg-gray-900/60 p-0.5">
+              {(['local', 'utc'] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => { if (timeMode !== m) toggleTime(); }}
+                  className={`px-2.5 py-1 rounded-md text-[10px] font-semibold uppercase tracking-wider transition-all ${
+                    timeMode === m ? 'bg-gray-700 text-white' : 'text-gray-500 hover:text-gray-300'
+                  }`}
+                >
+                  {m === 'local' ? 'Local' : 'UTC'}
+                </button>
+              ))}
+            </div>
             <button
               onClick={handleRefresh}
               disabled={refreshing}
