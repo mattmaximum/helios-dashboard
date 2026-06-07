@@ -474,7 +474,7 @@ export async function fetchSolarData(): Promise<SolarData> {
     fetchProductCSV<Record<string, string>>(URLS.mag),
     fetchJSON<Record<string, unknown>[]>(URLS.xray),
     fetchJSON<Record<string, unknown>[]>(URLS.f107),
-    fetchProductCSV<Record<string, string>>(URLS.kpForecast),
+    fetchJSON<Record<string, unknown>[]>(URLS.kpForecast),
     fetchJSON<Record<string, unknown>[]>(URLS.alerts),
     fetchJSON<Record<string, unknown>[]>(URLS.xrayFlares),
     fetch(URLS.forecast3day, { cache: 'no-store' }).then((r) => r.ok ? r.text() : Promise.reject(r.status)),
@@ -604,14 +604,14 @@ export async function fetchSolarData(): Promise<SolarData> {
   // Kp 3-day forecast (header+rows CSV-style product endpoint)
   let kpForecast: KpForecastPoint[];
   if (kpForecastResult.status === 'fulfilled') {
-    kpForecast = kpForecastResult.value.map((row) => {
-      const kpRaw = parseFloat(row.kp ?? row.Kp ?? '0');
-      const scale = row.noaa_scale ?? row.noaaScale ?? 'None';
+    kpForecast = (kpForecastResult.value as Record<string, unknown>[]).map((row) => {
+      const kpRaw = parseFloat(String(row.kp ?? row.Kp ?? '0'));
+      const scale = String(row.noaa_scale ?? row.noaaScale ?? 'None');
       return {
-        time: row.time_tag ?? '',
+        time: String(row.time_tag ?? ''),
         kp: isNaN(kpRaw) ? 0 : kpRaw,
-        observed: row.observed ?? 'predicted',
-        noaaScale: scale === '-' ? 'None' : scale,
+        observed: String(row.observed ?? 'predicted'),
+        noaaScale: scale === '-' || scale === 'null' ? 'None' : scale,
       };
     }).filter((p) => p.time !== '');
   } else {

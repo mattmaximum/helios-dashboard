@@ -39,24 +39,25 @@ export default function KpGauge({ currentKp }: Props) {
   const arrowPct = (clampedKp / TOTAL_FLEX) * 100;
 
   return (
-    <div className="rounded-2xl border border-gray-800/40 bg-gray-950/50 p-6 backdrop-blur-sm flex flex-col">
+    <div className="rounded-2xl border border-gray-800/40 bg-gray-950/50 p-4 backdrop-blur-sm flex flex-col">
       {/* Header */}
-      <div className="flex items-center gap-2 mb-5">
+      <div className="flex items-center gap-2 mb-3">
         <h3 className="text-sm font-semibold uppercase tracking-widest text-gray-400">Kp Index</h3>
         <InfoTip content="The planetary K-index (Kp) measures global geomagnetic disturbance on a 0–9 scale, updated every 15 minutes. Kp 0–4 is quiet. Kp 5 starts a G1 minor storm. Kp 6+ (G2) is when real-world impacts begin — satellite drag, power grid fluctuations, and auroras visible in the northern US." />
       </div>
 
       {/* Current Kp display */}
-      <div className="flex items-end gap-3 mb-6">
+      <div className="flex items-baseline gap-2 mb-4">
         <span
-          className="text-5xl font-bold tabular-nums leading-none"
+          className="text-3xl font-bold tabular-nums leading-none"
           style={{ color: stormLevel.color }}
         >
           {clampedKp.toFixed(1)}
         </span>
-        <p className="mb-1 text-sm font-semibold" style={{ color: stormLevel.color }}>
+        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Kp</span>
+        <span className="text-sm font-semibold ml-1" style={{ color: stormLevel.color }}>
           {stormLevel.label}
-        </p>
+        </span>
       </div>
 
       {/* Bar + arrow — flex-1 so it fills remaining space, content centered */}

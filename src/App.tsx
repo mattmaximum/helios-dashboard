@@ -165,6 +165,12 @@ export default function App() {
         {/* === Row: [SolarForecast + KpGauge + MetricCards + StormStatus] | [SolarRating + LiveSun] === */}
         <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
           <div className="flex flex-col gap-3">
+            <SolarRating
+              currentKp={currentKpNum}
+              windSpeed={data.currentSolarWind?.speed ?? null}
+              xrayClass={data.currentXrayClass}
+              f107={data.f107}
+            />
             <KpGauge currentKp={currentKpNum} />
             <SolarForecast
               kpForecast={data.kpForecast}
@@ -211,12 +217,6 @@ export default function App() {
             />
           </div>
           <div className="flex flex-col gap-3">
-            <SolarRating
-              currentKp={currentKpNum}
-              windSpeed={data.currentSolarWind?.speed ?? null}
-              xrayClass={data.currentXrayClass}
-              f107={data.f107}
-            />
             <LiveSun />
             <SolarEventLog events={data.solarEvents} />
           </div>
