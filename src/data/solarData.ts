@@ -318,7 +318,8 @@ function parse3DayForecast(text: string): SpaceWeatherAlert[] {
   const issueTime = issuedMatch ? parseNoaaTimeStr(issuedMatch[1]) : new Date().toISOString();
 
   // Only create an advisory if G1+ activity is forecast
-  const gMatch = text.match(/greatest expected 3 hr Kp[^(]*\(NOAA Scale (G[1-5])\)/i);
+  // The line wraps in NOAA's text ("(NOAA Scale\nG3).") so match loosely
+  const gMatch = text.match(/NOAA Scale\s+(G[1-5])\b/i);
   if (!gMatch) return [];
   const gScale = gMatch[1];
 
