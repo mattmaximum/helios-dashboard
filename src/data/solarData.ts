@@ -68,6 +68,15 @@ export interface SolarEvent {
   badge: string;       // "M2.3", "G2", "CME Watch", etc.
 }
 
+export interface SolarCyclePoint {
+  ts: number;
+  ssn: number | null;      // raw monthly observed
+  smoothed: number | null; // smoothed observed (null when not yet computed)
+  predicted: number | null;
+  bandBase: number | null; // low confidence bound (for stacked area rendering)
+  bandTop: number | null;  // high - low (band height, stacked on bandBase)
+}
+
 export interface SolarData {
   kpIndex: KpReading[];
   currentKp: number | null;
@@ -82,6 +91,7 @@ export interface SolarData {
   kpForecast: KpForecastPoint[];
   spaceWeatherAlerts: SpaceWeatherAlert[];
   solarEvents: SolarEvent[];
+  solarCycle: SolarCyclePoint[];
   lastUpdated: number;
 }
 
@@ -112,7 +122,9 @@ const URLS = {
   mag: 'https://services.swpc.noaa.gov/products/solar-wind/mag-7-day.json',
   xray: 'https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json',
   xrayFlares: 'https://services.swpc.noaa.gov/json/goes/primary/xray-flares-7-day.json',
-  f107: 'https://services.swpc.noaa.gov/products/solar-cycle/observed-solar-cycle-indices.json',
+  // /json/ path is the correct one; /products/ path is unreliable
+  solarCycleObs: 'https://services.swpc.noaa.gov/json/solar-cycle/observed-solar-cycle-indices.json',
+  solarCyclePred: 'https://services.swpc.noaa.gov/json/solar-cycle/predicted-solar-cycle.json',
   kpForecast: 'https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json',
   alerts: 'https://services.swpc.noaa.gov/products/alerts.json',
   forecast3day: 'https://services.swpc.noaa.gov/text/3-day-forecast.txt',
@@ -468,16 +480,17 @@ export async function fetchSolarData(): Promise<SolarData> {
   const lastUpdated = Date.now();
 
   // Fetch all APIs in parallel
-  const [kpResult, plasmaResult, magResult, xrayResult, f107Result, kpForecastResult, alertsResult, flaresResult, forecast3dayResult] = await Promise.allSettled([
+  const [kpResult, plasmaResult, magResult, xrayResult, solarCycleObsResult, kpForecastResult, alertsResult, flaresResult, forecast3dayResult, solarCyclePredResult] = await Promise.allSettled([
     fetchJSON<Record<string, unknown>[]>(URLS.kpIndex),
     fetchProductCSV<Record<string, string>>(URLS.plasma),
     fetchProductCSV<Record<string, string>>(URLS.mag),
     fetchJSON<Record<string, unknown>[]>(URLS.xray),
-    fetchJSON<Record<string, unknown>[]>(URLS.f107),
+    fetchJSON<Record<string, unknown>[]>(URLS.solarCycleObs),
     fetchJSON<Record<string, unknown>[]>(URLS.kpForecast),
     fetchJSON<Record<string, unknown>[]>(URLS.alerts),
     fetchJSON<Record<string, unknown>[]>(URLS.xrayFlares),
     fetch(URLS.forecast3day, { cache: 'no-store' }).then((r) => r.ok ? r.text() : Promise.reject(r.status)),
+    fetchJSON<Record<string, unknown>[]>(URLS.solarCyclePred),
   ]);
 
   // Kp index
@@ -579,14 +592,60 @@ export async function fetchSolarData(): Promise<SolarData> {
   const lastXray = xrayFlux.length > 0 ? xrayFlux[xrayFlux.length - 1] : null;
   const currentXrayClass = lastXray?.class || 'B0.0';
 
-  // F10.7cm radio flux — monthly solar cycle index, last entry is most recent
+  // F10.7cm radio flux + solar cycle chart data — same endpoint
   let f107: number | null = null;
-  if (f107Result.status === 'fulfilled' && Array.isArray(f107Result.value) && f107Result.value.length > 0) {
-    const last = f107Result.value[f107Result.value.length - 1] as Record<string, unknown>;
-    const raw = last['f10.7'] ?? last['f107'] ?? last['flux'];
-    f107 = typeof raw === 'number' ? raw : raw != null ? parseFloat(String(raw)) : null;
+  let solarCycle: SolarCyclePoint[] = [];
+
+  const cycleObsRows: Record<string, unknown>[] =
+    solarCycleObsResult.status === 'fulfilled' ? solarCycleObsResult.value : [];
+
+  if (cycleObsRows.length > 0) {
+    // f107 = last entry's smoothed or raw value
+    const last = cycleObsRows[cycleObsRows.length - 1];
+    const rawF107 = last['f10.7'] ?? last['smoothed_f10.7'];
+    f107 = typeof rawF107 === 'number' && rawF107 > 0 ? rawF107 : null;
+
+    // Solar cycle chart: last 11 years of observed data
+    const cutoffYear = new Date().getFullYear() - 11;
+    const cutoffTag = `${cutoffYear}-01`;
+    const observed: SolarCyclePoint[] = cycleObsRows
+      .filter((row) => String(row['time-tag'] ?? '') >= cutoffTag)
+      .map((row) => {
+        const tag = String(row['time-tag'] ?? '');
+        const ts = new Date(`${tag}-01T00:00:00Z`).getTime();
+        const rawSsn = Number(row['observed_swpc_ssn'] ?? row['ssn'] ?? -1);
+        const rawSmoothed = Number(row['smoothed_swpc_ssn'] ?? row['smoothed_ssn'] ?? -1);
+        return {
+          ts,
+          ssn: rawSsn >= 0 ? rawSsn : null,
+          smoothed: rawSmoothed > 0 ? rawSmoothed : null,
+          predicted: null,
+          bandBase: null,
+          bandTop: null,
+        };
+      });
+
+    // Merge with predicted data beyond the last observed month
+    const lastObservedTs = observed.length > 0 ? observed[observed.length - 1].ts : 0;
+    let predicted: SolarCyclePoint[] = [];
+    if (solarCyclePredResult.status === 'fulfilled') {
+      predicted = solarCyclePredResult.value
+        .map((row: Record<string, unknown>) => {
+          const tag = String(row['time-tag'] ?? '');
+          const ts = new Date(`${tag}-01T00:00:00Z`).getTime();
+          const p = Number(row['predicted_ssn'] ?? 0);
+          const hi = Number(row['high_ssn'] ?? p);
+          const lo = Number(row['low_ssn'] ?? 0);
+          return { ts, ssn: null, smoothed: null, predicted: p, bandBase: lo, bandTop: Math.max(0, hi - lo) };
+        })
+        .filter((pt) => pt.ts > lastObservedTs);
+    } else {
+      console.warn('[Helios] Solar cycle predicted API failed');
+    }
+
+    solarCycle = [...observed, ...predicted];
   } else {
-    console.warn('[Helios] F10.7 API failed, using null');
+    console.warn('[Helios] Solar cycle observed API failed, f107 and cycle chart unavailable');
   }
 
   // Solar event log — unified feed of M1.0+ flares, G1+ storm onsets, CME watches
@@ -660,6 +719,7 @@ export async function fetchSolarData(): Promise<SolarData> {
     kpForecast,
     spaceWeatherAlerts,
     solarEvents: finalSolarEvents,
+    solarCycle,
     lastUpdated,
   };
 }

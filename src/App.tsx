@@ -11,6 +11,7 @@ import SchumannResonance from './components/SchumannResonance';
 import SolarRating from './components/SolarRating';
 import SolarForecast from './components/SolarForecast';
 import SolarEventLog from './components/SolarEventLog';
+import SolarCycleChart from './components/SolarCycleChart';
 
 const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
@@ -243,6 +244,11 @@ export default function App() {
             xrayFlux={data.xrayFlux}
             solarWind={data.solarWind}
           />
+        </div>
+
+        {/* === Solar Cycle Progress === */}
+        <div className="mb-6">
+          <SolarCycleChart solarCycle={data.solarCycle} />
         </div>
 
         {/* === Schumann Resonance === */}
