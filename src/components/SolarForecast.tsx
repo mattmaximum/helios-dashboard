@@ -109,7 +109,7 @@ export default function SolarForecast({ kpForecast, spaceWeatherAlerts }: Props)
           {strips.map((point) => {
             const gScale = kpToGScale(point.kp);
             const color  = G_COLOR[gScale];
-            const isPast = point.observed !== 'predicted';
+            const isPast = new Date(point.time).getTime() < now;
             return (
               <div
                 key={point.time}
