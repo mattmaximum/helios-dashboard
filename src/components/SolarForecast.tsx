@@ -27,7 +27,10 @@ function kpToGScale(kp: number): string {
   return 'G5';
 }
 
-function alertColor(gScale: string | null): string {
+const HSS_COLOR = '#22D3EE'; // cyan — distinct from geomagnetic G-scale palette
+
+function alertColor(gScale: string | null, alertType?: string): string {
+  if (alertType === 'hss') return HSS_COLOR;
   if (!gScale) return '#FBBF24';
   return G_COLOR[gScale] ?? '#FBBF24';
 }
@@ -158,7 +161,7 @@ export default function SolarForecast({ kpForecast, spaceWeatherAlerts }: Props)
       <div className="mt-3 border-t border-gray-800/40 pt-3">
         <div className="flex items-center gap-2 mb-2">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">Space Weather Watches</p>
-          <InfoTip content="Active geomagnetic storm watches and CME arrival advisories issued by NOAA SWPC. A 'watch' means conditions are favorable for a storm; a 'warning' means onset is imminent. CME advisories include estimated arrival time when available." />
+          <InfoTip content="Active space weather watches issued by NOAA SWPC. Includes geomagnetic storm watches, CME arrival advisories, and coronal hole high-speed stream (CH HSS) notices. CH HSS events appear in cyan — they indicate enhanced solar wind from an Earth-facing coronal hole, which can produce G1–G2 storms as the wind arrives." />
         </div>
         {activeAlerts.length === 0 ? (
           <div className="flex items-center gap-2">
@@ -168,10 +171,15 @@ export default function SolarForecast({ kpForecast, spaceWeatherAlerts }: Props)
         ) : (
           <div className="flex flex-col gap-2.5">
             {activeAlerts.slice().reverse().slice(0, 3).map((alert, i) => {
-              const color = alertColor(alert.gScale);
+              const color = alertColor(alert.gScale, alert.alertType);
               const timeStr = alert.issueTime
                 ? fmt(alert.issueTime, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + suffix
                 : '';
+              const badge = alert.alertType === 'hss'
+                ? (alert.gScale ? `CH HSS · ${alert.gScale}` : 'CH HSS')
+                : alert.gScale
+                  ? `${alert.gScale} · ${G_LABEL[alert.gScale]}`
+                  : null;
               return (
                 <div key={i} className="flex gap-2 items-start">
                   <div
@@ -183,12 +191,12 @@ export default function SolarForecast({ kpForecast, spaceWeatherAlerts }: Props)
                       <p className="text-[10px] text-gray-600 leading-none mb-0.5">{timeStr}</p>
                     )}
                     <p className="text-xs text-gray-300 leading-snug">{alert.summary}</p>
-                    {alert.gScale && (
+                    {badge && (
                       <span
                         className="mt-1 inline-block text-[9px] font-bold px-1.5 py-0.5 rounded"
                         style={{ backgroundColor: `${color}22`, color, border: `1px solid ${color}44` }}
                       >
-                        {alert.gScale} · {G_LABEL[alert.gScale]}
+                        {badge}
                       </span>
                     )}
                   </div>

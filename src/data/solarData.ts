@@ -54,6 +54,7 @@ export interface SpaceWeatherAlert {
   message: string;
   gScale: string | null; // parsed G-scale if present
   summary: string;       // first substantive line
+  alertType: 'geomagnetic' | 'cme' | 'hss' | 'advisory';
 }
 
 export type EventSeverity = 'minor' | 'moderate' | 'severe' | 'extreme';
@@ -266,9 +267,22 @@ function getMockKpForecast(): KpForecastPoint[] {
   });
 }
 
-function extractAlertSummary(message: string): { gScale: string | null; summary: string } {
+function extractAlertSummary(message: string): { gScale: string | null; summary: string; alertType: SpaceWeatherAlert['alertType'] } {
   const gMatch = message.match(/\b(G[1-5])\b/);
   const gScale = gMatch ? gMatch[1] : null;
+  const upper = message.toUpperCase();
+
+  let alertType: SpaceWeatherAlert['alertType'];
+  if (upper.includes('CORONAL HOLE') || upper.includes('HIGH SPEED STREAM') || upper.includes('CH HSS')) {
+    alertType = 'hss';
+  } else if (upper.includes('CME') || upper.includes('CORONAL MASS')) {
+    alertType = 'cme';
+  } else if (upper.includes('GEOMAGNETIC') || upper.includes('STORM')) {
+    alertType = 'geomagnetic';
+  } else {
+    alertType = 'advisory';
+  }
+
   const lines = message.split('\n').map(l => l.trim()).filter(Boolean);
   let summary = '';
   for (const line of lines) {
@@ -284,7 +298,7 @@ function extractAlertSummary(message: string): { gScale: string | null; summary:
       break;
     }
   }
-  return { gScale, summary: summary || 'Space weather advisory issued.' };
+  return { gScale, summary: summary || 'Space weather advisory issued.', alertType };
 }
 
 function parseAlerts(raw: Record<string, unknown>[]): SpaceWeatherAlert[] {
@@ -295,18 +309,22 @@ function parseAlerts(raw: Record<string, unknown>[]): SpaceWeatherAlert[] {
         msg.includes('CME') ||
         msg.includes('CORONAL MASS') ||
         msg.includes('SOLAR ENERGETIC') ||
+        msg.includes('CORONAL HOLE') ||
+        msg.includes('HIGH SPEED STREAM') ||
+        msg.includes('CH HSS') ||
         (msg.includes('GEOMAGNETIC') && (msg.includes('WATCH') || msg.includes('WARNING') || msg.includes('ALERT'))) ||
         (msg.includes('STORM') && (msg.includes('WATCH') || msg.includes('WARNING')))
       );
     })
     .map((item) => {
       const message = String(item.message ?? '');
-      const { gScale, summary } = extractAlertSummary(message);
+      const { gScale, summary, alertType } = extractAlertSummary(message);
       return {
         issueTime: String(item.issue_datetime ?? item.product_id ?? ''),
         message,
         gScale,
         summary,
+        alertType,
       };
     })
     .slice(-8); // keep up to 8 most recent (CME watches often cluster)
@@ -326,26 +344,34 @@ function parseNoaaTimeStr(s: string): string {
 
 // Parse NOAA 3-day-forecast.txt for an active geomagnetic advisory
 function parse3DayForecast(text: string): SpaceWeatherAlert[] {
+  const upper = text.toUpperCase();
   const issuedMatch = text.match(/:Issued:\s*(\d{4} \w+ \d{2} \d{4} UTC)/);
   const issueTime = issuedMatch ? parseNoaaTimeStr(issuedMatch[1]) : new Date().toISOString();
 
-  // Only create an advisory if G1+ activity is forecast
-  // The line wraps in NOAA's text ("(NOAA Scale\nG3).") so match loosely
+  const isHss = upper.includes('CORONAL HOLE') || upper.includes('HIGH SPEED STREAM') || upper.includes('CH HSS');
+
+  // For non-HSS forecasts, only surface if G1+ storm activity is forecast
   const gMatch = text.match(/NOAA Scale\s+(G[1-5])\b/i);
-  if (!gMatch) return [];
-  const gScale = gMatch[1];
+  if (!gMatch && !isHss) return [];
+  const gScale = gMatch ? gMatch[1] : null;
+
+  const alertType: SpaceWeatherAlert['alertType'] = isHss ? 'hss' : 'geomagnetic';
 
   // Pull the geomagnetic rationale paragraph (section A)
   const ratMatch = text.match(/Rationale:\s*([^\n].+?)(?=\n\s*\n|\nB\.)/s);
+  const fallback = gScale
+    ? `${gScale} geomagnetic activity forecast — see NOAA 3-day forecast.`
+    : 'Enhanced solar wind from coronal hole — see NOAA 3-day forecast.';
   const rationale = ratMatch
     ? ratMatch[1].replace(/\s+/g, ' ').trim().slice(0, 250)
-    : `${gScale} geomagnetic activity forecast — see NOAA 3-day forecast.`;
+    : fallback;
 
   return [{
     issueTime,
     message: text,
     gScale,
     summary: rationale,
+    alertType,
   }];
 }
 
