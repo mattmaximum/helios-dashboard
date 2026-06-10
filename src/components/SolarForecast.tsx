@@ -44,9 +44,10 @@ interface TipState {
 interface Props {
   kpForecast: KpForecastPoint[];
   spaceWeatherAlerts: SpaceWeatherAlert[];
+  alertsFeedStale?: boolean;
 }
 
-export default function SolarForecast({ kpForecast, spaceWeatherAlerts }: Props) {
+export default function SolarForecast({ kpForecast, spaceWeatherAlerts, alertsFeedStale }: Props) {
   const now = Date.now();
   const { fmt, suffix } = useTime();
   const [tip, setTip] = useState<TipState | null>(null);
@@ -164,12 +165,20 @@ export default function SolarForecast({ kpForecast, spaceWeatherAlerts }: Props)
           <InfoTip content="Active space weather watches issued by NOAA SWPC. Includes geomagnetic storm watches, CME arrival advisories, and coronal hole high-speed stream (CH HSS) notices. CH HSS events appear in cyan — they indicate enhanced solar wind from an Earth-facing coronal hole, which can produce G1–G2 storms as the wind arrives." />
         </div>
         {activeAlerts.length === 0 ? (
-          <div className="flex items-center gap-2">
-            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500/80 shrink-0" />
-            <p className="text-xs text-gray-600">No active watches or advisories</p>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-2">
+              <div className="h-1.5 w-1.5 rounded-full bg-emerald-500/80 shrink-0" />
+              <p className="text-xs text-gray-600">No active watches or advisories</p>
+            </div>
+            {alertsFeedStale && (
+              <p className="text-[10px] text-gray-700 pl-3.5">NOAA alert feed may be stale — forecast discussion is the active source</p>
+            )}
           </div>
         ) : (
           <div className="flex flex-col gap-2.5">
+            {alertsFeedStale && (
+              <p className="text-[10px] text-gray-700">NOAA alert feed may be stale — forecast discussion is the active source</p>
+            )}
             {activeAlerts.slice().reverse().slice(0, 3).map((alert, i) => {
               const color = alertColor(alert.gScale, alert.alertType);
               const timeStr = alert.issueTime

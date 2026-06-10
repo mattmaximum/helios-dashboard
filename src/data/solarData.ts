@@ -94,6 +94,7 @@ export interface SolarData {
   solarEvents: SolarEvent[];
   solarCycle: SolarCyclePoint[];
   lastUpdated: number;
+  alertsFeedStale: boolean;
 }
 
 // --- Storm Level Mapper ---
@@ -129,6 +130,7 @@ const URLS = {
   kpForecast: 'https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json',
   alerts: 'https://services.swpc.noaa.gov/products/alerts.json',
   forecast3day: 'https://services.swpc.noaa.gov/text/3-day-forecast.txt',
+  discussion: 'https://services.swpc.noaa.gov/text/discussion.txt',
 } as const;
 
 const WAVELENGTHS = {
@@ -375,6 +377,44 @@ function parse3DayForecast(text: string): SpaceWeatherAlert[] {
   }];
 }
 
+// Parse NOAA Forecast Discussion for Solar Wind section CH HSS mentions.
+// discussion.txt is updated daily and often contains the earliest mention of
+// an approaching coronal hole high-speed stream before alerts.json catches up.
+function parseDiscussion(text: string): SpaceWeatherAlert[] {
+  const issuedMatch = text.match(/:Issued:\s*(\d{4} \w+ \d{2} \d{4} UTC)/);
+  const issueTime = issuedMatch ? parseNoaaTimeStr(issuedMatch[1]) : new Date().toISOString();
+
+  // Extract the Solar Wind section, then its .Forecast... subsection
+  const windSection = text.match(/\bSolar Wind\b([\s\S]*?)(?=\n[A-Z][a-z]+ [A-Z]|\nGeomagnetic|\nSpace Weather Highlights|$)/i);
+  if (!windSection) return [];
+
+  const forecastBlock = windSection[1].match(/\.Forecast\.\.\.\s*([\s\S]*?)(?=\n\.[A-Z]|\n\n\n|$)/);
+  if (!forecastBlock) return [];
+
+  const forecastText = forecastBlock[1].replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+  const upper = forecastText.toUpperCase();
+  if (!upper.includes('CORONAL HOLE') && !upper.includes('HIGH SPEED STREAM') && !upper.includes('CH HSS')) {
+    return [];
+  }
+
+  // Pull only the sentences that mention CH HSS so the summary stays concise
+  const sentences = forecastText.split(/(?<=[.!?])\s+/);
+  const relevant = sentences.filter((s) => {
+    const su = s.toUpperCase();
+    return su.includes('CORONAL HOLE') || su.includes('HIGH SPEED STREAM') || su.includes('CH HSS');
+  });
+  const summary = (relevant.length > 0 ? relevant : [forecastText])
+    .join(' ').replace(/\s+/g, ' ').trim().slice(0, 250);
+
+  return [{
+    issueTime,
+    message: text,
+    gScale: null,
+    summary,
+    alertType: 'hss',
+  }];
+}
+
 function flareSeverity(classStr: string): EventSeverity {
   const upper = classStr.toUpperCase();
   if (upper.startsWith('X')) {
@@ -506,7 +546,7 @@ export async function fetchSolarData(): Promise<SolarData> {
   const lastUpdated = Date.now();
 
   // Fetch all APIs in parallel
-  const [kpResult, plasmaResult, magResult, xrayResult, solarCycleObsResult, kpForecastResult, alertsResult, flaresResult, forecast3dayResult, solarCyclePredResult] = await Promise.allSettled([
+  const [kpResult, plasmaResult, magResult, xrayResult, solarCycleObsResult, kpForecastResult, alertsResult, flaresResult, forecast3dayResult, solarCyclePredResult, discussionResult] = await Promise.allSettled([
     fetchJSON<Record<string, unknown>[]>(URLS.kpIndex),
     fetchProductCSV<Record<string, string>>(URLS.plasma),
     fetchProductCSV<Record<string, string>>(URLS.mag),
@@ -517,6 +557,7 @@ export async function fetchSolarData(): Promise<SolarData> {
     fetchJSON<Record<string, unknown>[]>(URLS.xrayFlares),
     fetch(URLS.forecast3day, { cache: 'no-store' }).then((r) => r.ok ? r.text() : Promise.reject(r.status)),
     fetchJSON<Record<string, unknown>[]>(URLS.solarCyclePred),
+    fetch(URLS.discussion, { cache: 'no-store' }).then((r) => r.ok ? r.text() : Promise.reject(r.status)),
   ]);
 
   // Kp index
@@ -719,21 +760,35 @@ export async function fetchSolarData(): Promise<SolarData> {
     kpForecast = getMockKpForecast();
   }
 
-  // Space weather alerts (CME watches/warnings) — merge alerts.json + 3-day forecast
+  // Space weather alerts — merge alerts.json + 3-day forecast + discussion
   let spaceWeatherAlerts: SpaceWeatherAlert[];
+  let alertsFeedStale = false;
   if (alertsResult.status === 'fulfilled') {
     spaceWeatherAlerts = parseAlerts(alertsResult.value);
+    // alerts.json is sometimes weeks stale; flag it so the UI can warn the user
+    const newestAlertMs = spaceWeatherAlerts
+      .map((a) => new Date(a.issueTime).getTime())
+      .filter((t) => !isNaN(t))
+      .sort((a, b) => b - a)[0];
+    alertsFeedStale = newestAlertMs === undefined || newestAlertMs < lastUpdated - 3 * 24 * 60 * 60 * 1000;
   } else {
     console.warn('[Helios] Alerts API failed, using empty list');
     spaceWeatherAlerts = [];
+    alertsFeedStale = true;
   }
   // Supplement with the 3-day forecast advisory (alerts.json is sometimes stale)
   if (forecast3dayResult.status === 'fulfilled') {
     const forecastAlerts = parse3DayForecast(forecast3dayResult.value as string);
-    // Prepend so the forecast advisory appears alongside (or above) any archived alerts
     spaceWeatherAlerts = [...forecastAlerts, ...spaceWeatherAlerts];
   } else {
     console.warn('[Helios] 3-day forecast text failed:', forecast3dayResult.reason);
+  }
+  // Supplement with the Solar Weather Discussion (earliest source for CH HSS forecasts)
+  if (discussionResult.status === 'fulfilled') {
+    const discussionAlerts = parseDiscussion(discussionResult.value as string);
+    spaceWeatherAlerts = [...discussionAlerts, ...spaceWeatherAlerts];
+  } else {
+    console.warn('[Helios] Discussion text failed:', discussionResult.reason);
   }
 
   // Combine observed event types only (no watches/advisories — those go in the forecast section)
@@ -762,6 +817,7 @@ export async function fetchSolarData(): Promise<SolarData> {
     solarEvents: finalSolarEvents,
     solarCycle,
     lastUpdated,
+    alertsFeedStale,
   };
 }
 

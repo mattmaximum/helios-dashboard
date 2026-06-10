@@ -190,6 +190,7 @@ export default function App() {
             <SolarForecast
               kpForecast={data.kpForecast}
               spaceWeatherAlerts={data.spaceWeatherAlerts}
+              alertsFeedStale={data.alertsFeedStale}
             />
             <div className="grid grid-cols-2 gap-3">
               <MetricCard
